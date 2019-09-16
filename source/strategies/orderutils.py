@@ -11,7 +11,7 @@ SHORT = 'Short'
 PERCENT = 'Percent'
 TICK = 'Tick'
 
-def calc_stops(price, side, stoploss, takeprofit, mode=PERCENT):
+def calc_stops(price, side, stoploss, takeprofit, mode=TICK):
     '''Calculate Stop Loss and Take Profit based on price and
     method for calculation: percentage or ticks
 
@@ -25,7 +25,7 @@ def calc_stops(price, side, stoploss, takeprofit, mode=PERCENT):
         else:
             raise DirectionNotFound()
 
-    elif mode == TICKS:
+    elif mode == TICK:
         if side == LONG:
             return (price - stoploss) , (price + takeprofit)
         elif side == SHORT:
@@ -56,7 +56,8 @@ class OrderHandler:
         # Internal vars
         self._stoploss = None # Absolute value of stop loss
         self._takeprofit = None
-        self._exec_timestamp = None # Timestamp of order execution
+        self.executed_time = None
+        self.executed_price = None
 
     def execute(self, st):
         '''Execute market order with already given parameters
@@ -77,9 +78,6 @@ class OrderHandler:
                     )
         else:
             raise DirectionNotFound()
-        #TODO need broker confirmation to set executed as True
-        self.executed = True
-        self._exec_timestamp = pd.Timestamp(st.datas[0].datetime.datetime(0))
 
     def check_stops(self, current_price):
         '''Check if stops is not none and compare
@@ -110,9 +108,9 @@ class OrderHandler:
     def check_timedecay(self, now):
         '''Time decay is the time for closing order after the order is executed
         '''
-        if self._exec_timestamp is not None:
+        if self.executed_time is not None:
             if self.time_decay is not None:               
-                if pd.Timedelta(pd.Timestamp(now) - self._exec_timestamp).seconds >= self.time_decay:
+                if pd.Timedelta(pd.Timestamp(now) - pd.Timestamp(self.executed_time)).seconds >= self.time_decay:
                     return True
         return False
 
@@ -137,8 +135,6 @@ class OrderHandler:
                         )
             else:
                 raise DirectionNotFound()
-            # TODO broker confirmation
-            self.closed = True
 
     def set_timedecay(self, time=None):
         '''Configure time decay
@@ -150,6 +146,11 @@ class OrderHandler:
         '''
         self._takeprofit = tp
         self._stoploss = sl
+    
+    def set_executed(self, price, datetime):
+        self.executed = True
+        self.executed_time = datetime
+        self.executed_price = price
 
     def print_order(self):
         '''Print order variables to standard output
@@ -160,6 +161,8 @@ class OrderHandler:
             'side':self.side,
             'symbol':self.symbol,
             'executed':str(self.executed),
+            'executed price':str(self.executed_price),
+            'executed time':self.executed_time,
             'stoploss':str(self._stoploss),
             'takeprofit':str(self._takeprofit),
             'time_decay':str(self.time_decay),
@@ -175,6 +178,8 @@ class OrderHandler:
             'side':self.side,
             'symbol':self.symbol,
             'executed':str(self.executed),
+            'executed price':str(self.executed_price),
+            'executed time':self.executed_time,
             'stoploss':str(self._stoploss),
             'takeprofit':str(self._takeprofit),
             'time_decay':str(self.time_decay),

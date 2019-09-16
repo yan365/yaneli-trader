@@ -9,6 +9,8 @@ import argparse
 import time
 from strategies.fadesystem import FadeSystemIB
 
+# Data Parameter
+DEFAULT_FILE = 'dataname.csv'
 # Strategy Parameters
 MA_PERIOD = 5
 STD_PERIOD = 8
@@ -17,7 +19,15 @@ def parse_args(pargs=None):
     parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             description='IB Strategy')
-    
+    parser.add_argument(
+            '--data', '-d',
+            required=False,
+            default=DEFAULT_FILE,
+            action='store',
+            type=str,
+            help='File name'
+            )
+
     parser.add_argument(
             '--ma_period', '-p',
             required=False,
@@ -47,7 +57,7 @@ def run_strategy(args=None, **kwargs):
     cerebro = bt.Cerebro()
     
     data = btfeeds.GenericCSVData(
-            dataname = 'example.csv',
+            dataname = args.data,
             nullvalue = 0., 
             dtformat = ('%Y-%m-%d %H:%M:%S'),
             date = 0,
@@ -76,7 +86,6 @@ def run_strategy(args=None, **kwargs):
     sr = result[0].analyzers.sharpe.get_analysis()
     sr_result = 0. if sr['sharperatio'] is None else sr['sharperatio']
     pf = result[0].analyzers.pyfolio.get_pf_items()
-
 
     print('DrawDown: %s' % dd)
     print('Sharpe Ratio: %.2f' % sr_result)

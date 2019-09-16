@@ -112,17 +112,18 @@ class FadeSystemIB(bt.Strategy):
             'lotsize':[1, 2, 3, 1, 2, 3], 
             'ma_period':10,
             'stddev_period':10,
-            'std_threshold':0.1,
+            'std_threshold':0.0004,
+            'atr_period':14,
             'mp_valuearea':0.7, # Market Profile Value Area
             'mp_ticksize':0.0002, # Market Profile Tick Size
-            'stoploss':0.1,
-            'takeprofit':0.1,
+            'stoploss':0.005,
+            'takeprofit':0.005,
             'starttime':dt.time(0,0,0),
             'orderfinaltime':dt.time(15,0,0),
             'timetocloseorders':dt.time(16,0,0),
             'timebetweenorders':dt.time(0,1,0),
             'positiontimedecay':60*60*2, # Time in seconds to force a stop
-            'minimumchangeprice':2.0, # Minimum price change since last order
+            'minimumchangeprice':0.0003, # Minimum price change since last order
             }
 
     def __init__(self, **kwargs):
@@ -130,6 +131,7 @@ class FadeSystemIB(bt.Strategy):
         ## Indicators
         self.ma = btind.SimpleMovingAverage(self.datas[1].close, period=self.params.ma_period)
         self.stddev = btind.StandardDeviation(self.datas[1].close, period=self.params.stddev_period)
+        self.atr = btind.AverageTrueRange(self.datas[1], period=self.params.atr_period)
 
         ## Internal Vars
         # Stops
@@ -155,9 +157,8 @@ class FadeSystemIB(bt.Strategy):
         self._mode_for_short = NONE
 
         # Check if new High/Low is reached after last trade
-        #TODO
-        self._new_high = True
-        self._new_low = True
+        self._last_trade_high = None
+        self._last_trade_low = None
 
         # Order List
         self.order_list = []
@@ -175,6 +176,7 @@ class FadeSystemIB(bt.Strategy):
             'MA Period':self.params.ma_period,
             'STD Period':self.params.stddev_period,
             'STD Threshold':self.params.std_threshold,
+            'ATR Period':self.params.atr_period,
             'Stop Loss':self.params.stoploss,
             'Take Profit':self.params.takeprofit,
             'Lots':str(self.params.lotsize),
@@ -201,6 +203,8 @@ class FadeSystemIB(bt.Strategy):
             self._positions_closed = False
             self._last_longprice = None
             self._last_shortprice= None
+            self._last_trade_low = None
+            self._last_trade_high = None
 
         if now >= self.params.starttime and self._newday:
             self._newday = False
@@ -233,7 +237,6 @@ class FadeSystemIB(bt.Strategy):
             self._positions_closed = True
             return
 
-        self.remove_closed_positions()
         # Stops and Time Decay
         self.check_close_conditions()
 
@@ -248,12 +251,15 @@ class FadeSystemIB(bt.Strategy):
             self.log('[ %s Signal ]' % signal)
             if (signal == LONG and self._longdailyorders < len(self.params.lotsize) ) or (signal == SHORT and self._shortdailyorders < len(self.params.lotsize)):
                 if self.check_last_order_time() and \
-                        self.check_last_order_price(signal):
+                        self.check_last_order_price(signal) and \
+                        self.check_new_highlow(signal):
                     self.open_order(signal)
                 else:
-                    self.log('Minimum period between orders not reached')
+                    self.log('Minimum period between orders not reached %s ' % self.datas[0].datetime.datetime(0))
             else:
-                self.log('Max orders by day reached')
+                self.log('Max orders by day reached O:%s H:%s L:%s C:%s' %
+                        (self.datas[0].open[0],self.datas[0].high[0],
+                        self.datas[0].low[0],self.datas[0].close[0]))
 
     def check_last_order_price(self, signal):
         '''Compare current price with last order
@@ -278,7 +284,6 @@ class FadeSystemIB(bt.Strategy):
     def check_last_order_time(self):
         '''Minimum time for opening a new position
         '''
-        #TODO not considering the end of a day
         if pd.Timestamp(self.datas[0].datetime.datetime(0)) \
                 - pd.Timestamp(self._lastordertime) \
                 <= dt.timedelta(hours=self.params.timebetweenorders.hour):
@@ -295,7 +300,6 @@ class FadeSystemIB(bt.Strategy):
             if order.side == direction:
                 if order.executed and not order.closed:
                     self.order_list[i].close(self)
-        self.remove_closed_positions()
 
     def close_position(self, tradeid):
         '''Close position based on parameter id
@@ -303,7 +307,7 @@ class FadeSystemIB(bt.Strategy):
         for i in range(len(self.order_list)-1, 0, -1):
             if order._id == tradeid:
                 self.order_list[i].close(self)
-                self.order_list.pop(i)
+                #self.order_list.pop(i)
                 return
 
     def check_close_conditions(self):
@@ -316,17 +320,37 @@ class FadeSystemIB(bt.Strategy):
         # Iterate each order
         for i in range(len(self.order_list)-1, 0, -1):
             order = self.order_list[i]
-
-            # Check Stops and Time Decay
-            if order.check_stops(close) or order.check_timedecay(dt):
-                self.order_list[i].close(self)
-                self.log('Position Closed: %d  Price: %.5f\n%s' % (order._id, close, order.print_order()))
+            if not order.closed:
+                # Check Stops and Time Decay
+                if order.check_stops(close) or order.check_timedecay(dt):
+                    self.order_list[i].close(self)
+                    self.log('Position Closed: %d  Price: %.5f\n%s' % (order._id, close, order.print_order()))
     
     def check_std_dev(self):
         '''Check if current value of Standard Deviation indicator
         is equal or greater than Standard Deviation Threshold
         '''
         return (self.stddev[0] >= self.params.std_threshold)
+
+    def check_new_highlow(self, signal):
+
+        if signal == SHORT:
+            if self._last_trade_high is None:
+                return True
+
+            if self._last_trade_high < self.datas[1].high[0]:
+                return True
+
+        elif signal == LONG:
+            if self._last_trade_low is None:
+                return True
+
+            if self._last_trade_low < self.datas[1].low[0]:
+                return True
+
+        else:
+            raise DirectionNotFound()
+        return False
     
     def lookforsignals(self, market_profile):
         '''
@@ -361,7 +385,6 @@ class FadeSystemIB(bt.Strategy):
             else:
                 raise TradeModeNotFound()
         return NONE
-
 
     def parsedata(self, from_date=None, to_date=None, size_limit=60*60*24):
         '''Get data from backtrader cerebro and convert
@@ -438,27 +461,14 @@ class FadeSystemIB(bt.Strategy):
         Log a table with Market Profile Statistics
         '''
         profile_df = pd.DataFrame(profile_slice.as_dict(), index=[0])
-        self.log('[ Profile Statistics ] \n'+tabulate(profile_df, headers='keys', tablefmt='psql', showindex=False))
+        self.log('[ Profile Statistics ] \n'+
+                tabulate(profile_df, headers='keys', tablefmt='psql', showindex=False))
     
     def log(self, txt, dt=None):
         '''Print log messages and date
         '''
         dt = dt or self.datas[0].datetime.datetime(0)
         print('%s    %s' % (dt.isoformat(), txt))
-
-    def remove_closed_positions(self):
-        remove = []
-        for i in range(len(self.order_list)-1, 0, -1):
-            order = self.order_list[i]
-            if order.closed:
-                remove.append(i)
-        for i in remove:
-            self.order_list.pop(i)
-
-
-    def search_new_highs(self):
-        #TODO
-        return True
 
     def set_signal_mode(self, profile_slice):
         '''
@@ -502,21 +512,47 @@ class FadeSystemIB(bt.Strategy):
         '''Receive notifications in status changes of orders
         '''
         if order.status == order.Submitted:
-            self.log('Order Submitted')
+            self.log('Order [%d] Submitted' % order.tradeid)
 
         if order.status == order.Completed:
-            self.log('Order Completed: %d' % order.tradeid)
+            self.log('Order [%d] Completed' % order.tradeid)
             self._tradeid += 1
             self._lastordertime = self.datas[0].datetime.datetime(0)
+
+            self._last_trade_high = self.datas[1].high[0]
+            self._last_trade_low = self.datas[1].low[0]
+
             if order.isbuy():
                 self._longdailyorders += 1
-                self._last_longprice = order.price
+                #self._last_longprice = order.price
+                self._last_longprice = self.datas[0].close[0]
             elif order.issell():
                 self._shortdailyorders += 1
-                self._last_shortprice = order.price
+                #self._last_shortprice = order.price
+                self._last_shortprice = self.datas[0].close[0]
+
+            df = pd.DataFrame({
+                'Order price': order.price,
+                'Order time':self._lastordertime,
+                'Close':self.datas[0].close[0],
+                'Long daily orders':self._longdailyorders,
+                'Short daily orders':self._shortdailyorders,
+                }, index=[0])
+
+            self.log('DEBUG \n'+
+                    tabulate(df, headers='keys', tablefmt='psql', showindex=False))
+            for i in range(len(self.order_list)-1, 0 , -1):
+                if self.order_list[i]._id == order.tradeid:
+                    if self.order_list[i].executed:
+                        self.order_list[i].closed = True
+                    else:
+                        self.order_list[i].executed = True
+                        self.order_list[i]._exec_timestamp = pd.Timestamp(self.datas[0].datetime.datetime(0))
+                        self.order_list[i].executed_price = self.datas[0].close[0]
+                        self.order_list[i].executed_time = self.datas[0].datetime.datetime(0)
 
         if order.status == order.Canceled:
-            self.log('Order Canceled')
+            self.log('Order [%d] Canceled' % order.tradeid)
 
         if order.status == order.Expired:
             self.log('Order Expired')
@@ -582,12 +618,11 @@ class FadeSystemIB(bt.Strategy):
             }, index=[0])
 
         self.log('[ CRON Report ] \n'+
-                tabulate(df, headers='keys', tablefmt='psql', showindex=False)+'\n'+
-                tabulate(data1, headers='keys', tablefmt='psql', showindex=False)+'\n'+
+                tabulate(df, headers='keys', tablefmt='psql', showindex=False)+'\nData1: \n'+
+                tabulate(data1, headers='keys', tablefmt='psql', showindex=False)+'\nData2: \n'+
                 tabulate(data2, headers='keys', tablefmt='psql', showindex=False))
-        for order in self.order_list:
-            order.print_order()
 
     def stop(self):
-        pass
-
+        self.log('[ Strategy Stop] \nPrinting orders:')
+        for order in self.order_list:
+            order.print_order()
