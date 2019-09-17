@@ -448,7 +448,7 @@ class FadeSystemIB(bt.Strategy):
                 lots=_lots,
                 side=signal,
                 )
-        order.execute(self)
+        order.market_order(self)
         sl, tp = calc_stops(self.datas[0].close[0], signal,
                 self.params.stoploss, self.params.takeprofit)
         order.set_stops(sl, tp)

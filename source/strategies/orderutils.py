@@ -59,7 +59,7 @@ class OrderHandler:
         self.executed_time = None
         self.executed_price = None
 
-    def execute(self, st):
+    def market_order(self, st):
         '''Execute market order with already given parameters
         '''
         if self.side == LONG:
@@ -75,6 +75,123 @@ class OrderHandler:
                     price=None, 
                     exectype=Order.Market, 
                     tradeid=self._id, 
+                    )
+        else:
+            raise DirectionNotFound()
+
+    def limit_order(self, st, price, valid = None):
+        '''Execute Limit Order
+        '''
+        if self.side == LONG:
+            self.order = st.buy(
+                    size = self.lot,
+                    price = price,
+                    exectype = Order.Limit,
+                    tradeid = self._id,
+                    valid = valid,
+                    )
+        elif self.side == SHORT:
+            self.order = st.sell(
+                    size = self.lot,
+                    price = price,
+                    exectype = Order.Limit,
+                    tradeid = self._id,
+                    valid = valid,
+                    )
+        else:
+            raise DirectionNotFound()
+
+    def stop_order(self, st, trigger_price, valid = None):
+        '''Execute Stop Order
+        '''
+        if self.side == LONG:
+            self.order = st.buy(
+                    size = self.lot,
+                    price = trigger_price,
+                    exectype = Order.Stop,
+                    tradeid = self._id,
+                    valid = valid,
+                    )
+        elif self.side == SHORT:
+            self.order = st.sell(
+                    size = self.lot,
+                    price = trigger_price,
+                    exectype = Order.Stop,
+                    tradeid = self._id,
+                    valid = valid,
+                    )
+        else:
+            raise DirectionNotFound()
+
+    def stoplimit_order(self, st, trigger_price, limit_price, valid=None):
+        '''Execute Limit Order at Trigger Price
+        '''
+        if self.side == LONG:
+            self.order = st.buy(
+                    size = self.lot,
+                    price = trigger_price,
+                    pricelimit = limit_price,
+                    exectype = Order.StopLimit,
+                    tradeid = self._id,
+                    valid = valid,
+                    )
+        elif self.side == SHORT:
+            self.order = st.sell(
+                    size = self.lot,
+                    price = trigger_price,
+                    pricelimit = limit_price,
+                    exectype = Order.StopLimit,
+                    tradeid = self._id,
+                    valid = valid,
+                    )
+        else:
+            raise DirectionNotFound()
+
+    def protection_order(self, st, price, valid = None):
+        '''Market with Protection Order (IB only)
+        '''
+        args = {
+                'orderType':'MKT PRT',
+                'auxPrice':price,
+                }
+        if self.side == LONG:
+            self.order = st.buy(
+                    size = self.lot,
+                    tradeid = self._id,
+                    valid = valid,
+                    **args
+                    )
+        elif self.side == SHORT:
+            self.order = st.sell(
+                    size = self.lot,
+                    tradeid = self._id,
+                    valid = valid,
+                    **args
+                    )
+        else:
+            raise DirectionNotFound()
+
+    def lit_order(self, st, limit_price, aux_price):
+        '''Limit if Touched Order (IB only)
+        '''
+        args = {
+                'orderType':'LIT',
+                'lmtPrice':limit_price,
+                'auxPrice':aux_price,
+                }
+        if self.side == LONG:
+            self.order = st.buy(
+                    size = self.lot,
+                    tradeid = self._id,
+                    valid = valid,
+                    **args
+                    )
+        elif self.side == SHORT:
+            self.order = st.sell(
+                    size = self.lot,
+                    tradeid = self._id,
+                    valid = valid,
+                    **args
                     )
         else:
             raise DirectionNotFound()
