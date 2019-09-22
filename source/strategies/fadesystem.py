@@ -162,6 +162,8 @@ class FadeSystemIB(bt.Strategy):
 
         # Order List
         self.order_list = []
+        # Used for ploting
+        self._daily_orders = []
 
         # If all positions were already closed
         self._positions_closed = False
@@ -215,11 +217,15 @@ class FadeSystemIB(bt.Strategy):
             lastday_end = dt.datetime.timestamp(
                     pd.Timestamp(self._lastday)+dt.timedelta(days=1))
 
-            # Generate Market Profile
+            # Get day before data
             data = self.parsedata(
                         from_date=lastday_begin, 
                         to_date=lastday_end)
 
+            # Plot data and orders
+            self.daily_plot(data, self._daily_orders)
+
+            # Generate Market Profile
             self._mp, self._mp_slice = generateprofiles(
                     data, 
                     ticksize=self.params.mp_ticksize,
@@ -229,6 +235,7 @@ class FadeSystemIB(bt.Strategy):
             self.set_signal_mode(self._mp_slice)
 
             self._lastday = today
+            self._daily_orders = []
 
         if now >= self.params.timetocloseorders and not self._positions_closed:
             # Time to close all current positions
@@ -351,6 +358,27 @@ class FadeSystemIB(bt.Strategy):
         else:
             raise DirectionNotFound()
         return False
+
+    def daily_plot(self, data, orders):
+        '''Plot close data with orders parameters
+        '''
+        plt.plot(data['Close'], linewidth=1)
+        plt.title()# TODO get min and max timestamp
+        plt.grid(True)
+        plt.ylabel('')
+        plt.xlabel('')
+        for order in orders:
+            if order.executed_price is not None:
+                if order.side == LONG:
+                    plt.plot(order.executed_price, order.executed_time, 'o')
+                elif order.side == SHORT:
+                    plt.plot(order.executed_price, order.executed_time, 'o')
+
+            if order._stoploss is not None:
+                plt.plot()
+            if order._takeprofit is not None:
+                plt.plot()
+        plt.savefig()
     
     def lookforsignals(self, market_profile):
         '''
@@ -455,6 +483,7 @@ class FadeSystemIB(bt.Strategy):
         order.set_timedecay(self.params.positiontimedecay)
         order.print_order()
         self.order_list.append(order)
+        self._daily_orders.append(order)
 
     def profilestatistics(self, profile_slice):
         '''
