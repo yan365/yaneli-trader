@@ -5,6 +5,7 @@ import backtrader as bt
 import backtrader.indicators as btind
 import datetime as dt
 import pandas as pd
+import matplotlib.pyplot as plt
 from tabulate import tabulate
 from market_profile import MarketProfile
 from strategies.orderutils import *
@@ -50,6 +51,7 @@ def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7,
 
     # Save figure
     if save_fig:
+        plt.clf()
         fig = profile.plot(kind='barh')
         fig.figure.savefig(
                 str(mp_mode+dataframe['datetime'].iloc[
@@ -162,6 +164,8 @@ class FadeSystemIB(bt.Strategy):
 
         # Order List
         self.order_list = []
+        # Used for ploting
+        self._daily_orders = []
 
         # If all positions were already closed
         self._positions_closed = False
@@ -215,11 +219,15 @@ class FadeSystemIB(bt.Strategy):
             lastday_end = dt.datetime.timestamp(
                     pd.Timestamp(self._lastday)+dt.timedelta(days=1))
 
-            # Generate Market Profile
+            # Get day before data
             data = self.parsedata(
                         from_date=lastday_begin, 
                         to_date=lastday_end)
 
+            # Plot data and orders
+            self.daily_plot(data, self._daily_orders)
+
+            # Generate Market Profile
             self._mp, self._mp_slice = generateprofiles(
                     data, 
                     ticksize=self.params.mp_ticksize,
@@ -229,6 +237,7 @@ class FadeSystemIB(bt.Strategy):
             self.set_signal_mode(self._mp_slice)
 
             self._lastday = today
+            self._daily_orders = []
 
         if now >= self.params.timetocloseorders and not self._positions_closed:
             # Time to close all current positions
@@ -351,6 +360,33 @@ class FadeSystemIB(bt.Strategy):
         else:
             raise DirectionNotFound()
         return False
+
+    def daily_plot(self, data, orders):
+        '''Plot close data with orders parameters
+        '''
+        title = str(data['datetime'].iloc[\
+                data['datetime'].size-1]).\
+                replace(' ','_').replace(':','')
+        plt.clf()
+        plt.plot(data['Close'], linewidth=1)
+        plt.title(title)
+        plt.grid(True)
+        plt.ylabel('Close')
+        plt.xlabel('Time')
+        plt.tight_layout()
+        for order in orders:
+            if order.executed_price is not None:
+                # Plot Order
+                if order.side == LONG:
+                    plt.plot(order.executed_price, order.executed_time, 'o')
+                elif order.side == SHORT:
+                    plt.plot(order.executed_price, order.executed_time, 'o')
+                # Plot Stops
+                if order._stoploss is not None:
+                    plt.plot(order._stoploss, order.executed_time, 'v')
+                if order._takeprofit is not None:
+                    plt.plot(order._takeprofit, order.executed_time, '^')
+        plt.savefig(title+'.png')
     
     def lookforsignals(self, market_profile):
         '''
@@ -455,6 +491,7 @@ class FadeSystemIB(bt.Strategy):
         order.set_timedecay(self.params.positiontimedecay)
         order.print_order()
         self.order_list.append(order)
+        self._daily_orders.append(order)
 
     def profilestatistics(self, profile_slice):
         '''
