@@ -5,6 +5,7 @@ import backtrader as bt
 import backtrader.indicators as btind
 import datetime as dt
 import pandas as pd
+import matplotlib.pyplot as plt
 from tabulate import tabulate
 from market_profile import MarketProfile
 from strategies.orderutils import *
@@ -50,6 +51,7 @@ def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7,
 
     # Save figure
     if save_fig:
+        plt.clf()
         fig = profile.plot(kind='barh')
         fig.figure.savefig(
                 str(mp_mode+dataframe['datetime'].iloc[
@@ -362,23 +364,29 @@ class FadeSystemIB(bt.Strategy):
     def daily_plot(self, data, orders):
         '''Plot close data with orders parameters
         '''
+        title = str(data['datetime'].iloc[\
+                data['datetime'].size-1]).\
+                replace(' ','_').replace(':','')
+        plt.clf()
         plt.plot(data['Close'], linewidth=1)
-        plt.title()# TODO get min and max timestamp
+        plt.title(title)
         plt.grid(True)
-        plt.ylabel('')
-        plt.xlabel('')
+        plt.ylabel('Close')
+        plt.xlabel('Time')
+        plt.tight_layout()
         for order in orders:
             if order.executed_price is not None:
+                # Plot Order
                 if order.side == LONG:
                     plt.plot(order.executed_price, order.executed_time, 'o')
                 elif order.side == SHORT:
                     plt.plot(order.executed_price, order.executed_time, 'o')
-
-            if order._stoploss is not None:
-                plt.plot()
-            if order._takeprofit is not None:
-                plt.plot()
-        plt.savefig()
+                # Plot Stops
+                if order._stoploss is not None:
+                    plt.plot(order._stoploss, order.executed_time, 'v')
+                if order._takeprofit is not None:
+                    plt.plot(order._takeprofit, order.executed_time, '^')
+        plt.savefig(title+'.png')
     
     def lookforsignals(self, market_profile):
         '''
