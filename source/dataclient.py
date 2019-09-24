@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from ib_insync import *
+import datetime as dt
+import pandas as pd
 
 HOST = '127.0.0.1'
 PORT = 7497
@@ -45,6 +47,36 @@ class IBDataClient:
         dataframe = util.df(data)
         return dataframe
 
+    def getdata_dt(self, symbol, symboltype, exchange='IDEALPRO', 
+            currency='USD', timeframe='1 secs', 
+            fromdate= dt.datetime(2015,1,1), 
+            todate= dt.datetime.now(), **kwargs):
+        '''Download data and return as Data Frame
+        '''
+        durationstr = self._secs_duration(fromdate) + ' S'
+
+        contract_args = {
+                'symbol':symbol,
+                'symboltype':symboltype,
+                'exchange':exchange,
+                'currency':currency,
+                }
+        contract = self.getcontract(**contract_args)
+
+        data_args = {
+                'contract':contract,
+                'barSizeSetting':timeframe,
+                'durationStr':durationstr,
+                'endDateTime':todate,
+                'whatToShow':'MIDPOINT',
+                'useRTH':True,
+                }
+        data_args.update(kwargs)
+
+        data = self.client.reqHistoricalData(**data_args)
+        dataframe = util.df(data)
+        return dataframe
+
     def earliestbar(self, symbol, symboltype, exchange, **kwargs):
         '''Get oldest bar date
         '''
@@ -71,6 +103,14 @@ class IBDataClient:
 
     def close(self):
         self.client.disconnect()
+
+    def _secs_duration(self, datetime):
+        '''Get total seconds from datetime parameter to
+        current time
+        '''
+        _datetime = pd.Timestamp(dt.datetime.now()) - pd.Timestamp(datetime)
+        return str(int(_datetime.total_seconds()))
+
 
 '''Shortcut to download and save data
 '''

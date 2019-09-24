@@ -5,6 +5,7 @@ import sys
 sys.path.append('../source/')
 
 import dataclient
+import datetime as dt
 
 HOST = '127.0.0.1'
 PORT = 7497
@@ -45,6 +46,21 @@ args = {
         }
 
 data = client.getdata(**args)
-data.head()
+print(data.head())
+
+args = {
+        'symbol':'AUDUSD',
+        'symboltype':'Forex',
+        'exchange':'IDEALPRO',
+        'currency':'USD',
+        'timeframe':'1 hour',
+        'fromdate':dt.datetime(2019,9,23),
+        'todate':dt.datetime(2019,9,24)
+        }
+
+data2 = client.getdata_dt(**args)
+print(data2.head())
+print(data2.tail())
+
 client.close()
 
