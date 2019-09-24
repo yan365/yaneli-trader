@@ -51,16 +51,17 @@ def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7,
 
     # Save figure
     if save_fig:
+        val, vah = mp_slice.value_area
         plt.clf()
+        plt.axhline(y=val, color='yellow', linestyle= '-')
+        plt.axhline(y=vah, color='blue', linestyle= '-')
+        plt.plot(dataframe['Open'].iloc[0], color='red', marker='o')
         fig = profile.plot(kind='barh')
         fig.figure.savefig(
                 str(mp_mode+dataframe['datetime'].iloc[
                     dataframe['datetime'].size-1]).
                 replace(' ','_').replace(':','')+'.png')
-
     return profile, mp_slice
-
-
 
 class FadeSystemIB(bt.Strategy):
     '''
