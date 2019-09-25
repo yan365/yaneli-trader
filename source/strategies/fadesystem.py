@@ -375,18 +375,24 @@ class FadeSystemIB(bt.Strategy):
         plt.ylabel('Close')
         plt.xlabel('Time')
         plt.tight_layout()
+
         for order in orders:
             if order.executed_price is not None:
+
                 # Plot Order
                 if order.side == LONG:
-                    plt.plot(order.executed_price, order.executed_time, 'o')
+                    _color = 'blue'
+                    plt.plot(order.executed_time, order.executed_price, marker='^', color= _color)
                 elif order.side == SHORT:
-                    plt.plot(order.executed_price, order.executed_time, 'o')
+                    _color = 'red'
+                    plt.plot(order.executed_time, order.executed_price, marker='v', color= _color)
+
                 # Plot Stops
                 if order._stoploss is not None:
-                    plt.plot(order._stoploss, order.executed_time, 'v')
+                    plt.plot(order.executed_time, order._stoploss, '_', color= _color)
                 if order._takeprofit is not None:
-                    plt.plot(order._takeprofit, order.executed_time, '^')
+                    plt.plot(order.executed_time, order._takeprofit, '_', color= _color)
+        
         plt.savefig(title+'.png')
     
     def lookforsignals(self, market_profile):
