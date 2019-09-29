@@ -9,6 +9,9 @@ PORT = 7497
 CLIENT_ID = '1234'
 
 FOREX = 'Forex'
+FUTURES = 'Futures'
+INDEX = 'Index'
+OPTION = 'Option'
 STOCK = 'Stock'
 
 class IBDataClient:
@@ -91,15 +94,95 @@ class IBDataClient:
         return self.client.reqHeadTimeStamp(**args)
 
     def getcontract(self, symbol, symboltype, **kwargs):
+
+        args = dict()
+
         if symboltype == FOREX:
-            return Forex(symbol, 
-                    exchange= kwargs['exchange'])
+
+            if 'currency' in kwargs.keys():
+                args.update({'currency':kwargs.pop('currency')})
+            if 'exchange' in kwargs.keys():
+                args.update({'exchange':kwargs.pop('exchange')})
+            if 'conId' in kwargs.keys():
+                args.update({'conId': kwargs.pop('conId')})
+            if 'localSymbol' in kwargs.keys():
+                args.update({'localSymbol': kwargs.pop('localSymbol')})
+            if 'tradingClass' in kwargs.keys():
+                args.update({'tradingClass':kwargs.pop('tradingClass')})
+
+            return Forex(symbol, **args)
+
+        elif symboltype == FUTURES:
+
+            if 'currency' in kwargs.keys():
+                args.update({'currency':kwargs.pop('currency')})
+            if 'exchange' in kwargs.keys():
+                args.update({'exchange':kwargs.pop('exchange')})
+            if 'localSymbol' in kwargs.keys():
+                args.update({'localSymbol': kwargs.pop('localSymbol')})
+            if 'lastTradeDateOrContractMonth' in kwargs.keys():
+                args.update({'lastTradeDateOrContractMonth': 
+                    kwargs.pop('lastTradeDateOrContractMonth')})
+
+            return Future(symbol, **args)
+
         elif symboltype == STOCK:
-            return Stock(symbol, 
-                    exchange= kwargs['exchange'],
-                    currency= kwargs['currency'])
+            
+            if 'currency' in kwargs.keys():
+                args.update({'currency':kwargs.pop('currency')})
+            if 'exchange' in kwargs.keys():
+                args.update({'exchange':kwargs.pop('exchange')})
+            if 'conId' in kwargs.keys():
+                args.update({'conId': kwargs.pop('conId')})
+            if 'primaryExchange' in kwargs.keys():
+                args.update({'primaryExchange': 
+                    kwargs.pop('primaryExchange')})
+            if 'localSymbol' in kwargs.keys():
+                args.update({'localSymbol': kwargs.pop('localSymbol')})
+            if 'tradingClass' in kwargs.keys():
+                args.update({'tradingClass':kwargs.pop('tradingClass')})
+
+            return Stock(symbol, **args)
+
+        elif symboltype == INDEX:
+
+            if 'currency' in kwargs.keys():
+                args.update({'currency':kwargs.pop('currency')})
+            if 'exchange' in kwargs.keys():
+                args.update({'exchange':kwargs.pop('exchange')})
+            if 'conId' in kwargs.keys():
+                args.update({'conId': kwargs.pop('conId')})
+            if 'localSymbol' in kwargs.keys():
+                args.update({'localSymbol':kwargs.pop('localSymbol')})
+
+            return Index(symbol, **args)
+
+        elif symboltype == OPTION:
+
+            if 'exchange' in kwargs.keys():
+                args.update({'exchange':kwargs.pop('exchange')})
+            if 'tradingClass' in kwargs.keys():
+                args.update({'tradingClass':kwargs.pop('tradingClass')})
+            if 'conId' in kwargs.keys():
+                args.update({'conId': kwargs.pop('conId')})
+            if 'right' in kwargs.keys():
+                args.update({'right':kwargs.pop('right')})
+            if 'strike' in kwargs.keys():
+                args.update({'strike':kwargs.pop('strike')})
+            if 'multiplier' in kwargs.keys():
+                args.update({'multiplier':kwargs.pop('multiplier')})
+            if 'localSymbol' in kwargs.keys():
+                args.update({'localSymbol':kwargs.pop('localSymbol')})
+            if 'lastTradeDateOrContractMonth' in kwargs.keys():
+                args.update({'lastTradeDateOrContractMonth': 
+                    kwargs.pop('lastTradeDateOrContractMonth')})
+
+            return Option(symbol, **args)
         else:
             raise ('Symbol Type not found')
+
+    def positions(self):
+        print(self.client.positions())
 
     def close(self):
         self.client.disconnect()
