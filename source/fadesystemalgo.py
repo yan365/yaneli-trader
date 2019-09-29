@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import backtrader as bt
-import backtrader.indicators as btind
 import backtrader.feeds as btfeeds
 import backtrader.analyzers as analyzer
 import argparse
