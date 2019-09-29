@@ -49,6 +49,21 @@ MINIMUMPRICECHANGE_MIN = 10
 MINIMUMPRICECHANGE_MAX = 10
 MINIMUMPRICECHANGE_STEP = 10
 
+class AcctStats(bt.Analyzer):
+    
+    def __init__(self):
+        self.start_val = self.strategy.broker.get_value()
+        self.end_val = None
+
+    def stop(self):
+        self.end_val = self.strategy.broker.get_value()
+
+    def get_analysis(self):
+        return { "start":self.start_val, 
+                "end": self.end_val,
+                "growth": self.end_val - start_val,
+                "return": self.end_val/self.start_val}
+
 def parse_args(pargs=None):
     parser = argparse.ArgumentParser(
             formatter_class = argparse.ArgumentDefaultsHelpFormatter,
@@ -146,12 +161,23 @@ def run_optimization(args=None, **kwargs):
             timeframe = bt.TimeFrame.Minutes,
             compression = 5)
 
+    cerebro.addanalyzer(AcctStats)
+
     strategies = cerebro.optstrategy(
             FadeSystemIB,
             **params)
 
     results = cerebro.run()
 
+    result = pd.DataFrame({
+        result[0].params.optim_fs: result[0].broker.getvalue() \
+                for result in results}).T.loc[:, [
+                    'end', 'growth', 'return']]
+
+    sorted_values = result.sort_values('return', ascending=False)
+    sorted_values.to_csv(OUTPUT_FILENAME, FILE_DELIMITER)
+
+    print(tabulate(sorted_values))
 
 if __name__ == '__main__':
     run_optimization()
