@@ -61,14 +61,16 @@ class AcctStats(bt.Analyzer):
     def get_analysis(self):
         return { "start":self.start_val, 
                 "end": self.end_val,
-                "growth": self.end_val - start_val,
+                "growth": self.end_val - self.start_val,
                 "return": self.end_val/self.start_val}
 
 def parse_args(pargs=None):
+
     parser = argparse.ArgumentParser(
             formatter_class = argparse.ArgumentDefaultsHelpFormatter,
             description='Fade System Optimization'
             )
+
     parser.add_argument(
             '--data', '-d',
             required= False,
@@ -76,6 +78,7 @@ def parse_args(pargs=None):
             action= 'store',
             type= str,
             help= 'Input File Name')
+
     if pargs is not None:
         return parser.parse_args(pargs)
     return parser.parse_args()
@@ -169,15 +172,18 @@ def run_optimization(args=None, **kwargs):
 
     results = cerebro.run()
 
-    result = pd.DataFrame({
-        result[0].params.optim_fs: result[0].broker.getvalue() \
-                for result in results}).T.loc[:, [
-                    'end', 'growth', 'return']]
+    df_results = pd.DataFrame({
+        r[0].params: 
+        r[0].analyzers.acctstats.get_analysis() for r in results}
+        ).T.loc[:, ['end', 'growth', 'return']]
 
-    sorted_values = result.sort_values('return', ascending=False)
+    print(df_results.head())
+
+    sorted_values = df_results.sort_values('return', ascending= False)
     sorted_values.to_csv(OUTPUT_FILENAME, FILE_DELIMITER)
 
     print(tabulate(sorted_values))
 
 if __name__ == '__main__':
     run_optimization()
+
