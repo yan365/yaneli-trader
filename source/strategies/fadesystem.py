@@ -11,6 +11,9 @@ from market_profile import MarketProfile
 from strategies.orderutils import *
 from strategies.exceptions import DirectionNotFound, TradeModeNotFound, OrderNotExecuted
 
+LOG = False
+SAVEFIGURES = False
+
 BELOW_RANGE = 'Below Range'
 BELOW_VAL = 'Below VAL'
 ABOVE_VAH = 'Above VAH'
@@ -232,7 +235,8 @@ class FadeSystemIB(bt.Strategy):
             self._mp, self._mp_slice = generateprofiles(
                     data, 
                     ticksize=self.params.mp_ticksize,
-                    valuearea=self.params.mp_valuearea)
+                    valuearea=self.params.mp_valuearea,
+                    save_fig=SAVEFIGURES)
 
             self.profilestatistics(self._mp_slice)
             self.set_signal_mode(self._mp_slice)
@@ -511,8 +515,9 @@ class FadeSystemIB(bt.Strategy):
     def log(self, txt, dt=None):
         '''Print log messages and date
         '''
-        dt = dt or self.datas[0].datetime.datetime(0)
-        print('%s    %s' % (dt.isoformat(), txt))
+        if LOG:
+            dt = dt or self.datas[0].datetime.datetime(0)
+            print('%s    %s' % (dt.isoformat(), txt))
 
     def set_signal_mode(self, profile_slice):
         '''

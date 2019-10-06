@@ -26,28 +26,16 @@ OPTIMIZE_TAKEPROFIT = True
 OPTIMIZE_POSITIONTIMEDECAY = True
 OPTIMIZE_MINIMUMPRICECHANGE = True
 
-MA_PERIOD_MIN = 10
-MA_PERIOD_MAX = 10
-MA_PERIOD_STEP = 2
-STDDEV_PERIOD_MIN = 10
-STDDEV_PERIOD_MAX = 10
-STDDEV_PERIOD_STEP = 10
-STD_THRESHOLD_MIN = 10
-STD_THRESHOLD_MAX = 10
-STD_THRESHOLD_STEP = 10
-ATR_PERIOD_MIN = 10
-ATR_PERIOD_MAX = 10
-ATR_PERIOD_STEP = 10
-MP_VALUEAREA_RANGE = [0.5]
-MP_TICKSIZE_RANGE = [0.2]
+MA_PERIOD = [5, 10, 15]
+STDDEV_PERIOD = [6, 8, 10, 12]
+STD_THRESHOLD = [0.0008, 0.001]
+ATR_PERIOD = [10, 14, 18]
+MP_VALUEAREA_RANGE = [0.5, 0.7]
+MP_TICKSIZE_RANGE = [0.2, 0.3]
 STOPLOSS_RANGE = [0.2]
 TAKEPROFIT_RANGE = [0.2]
-POSITIONTIMEDECAY_MIN = 10
-POSITIONTIMEDECAY_MAX = 10
-POSITIONTIMEDECAY_STEP = 10
-MINIMUMPRICECHANGE_MIN = 10
-MINIMUMPRICECHANGE_MAX = 10
-MINIMUMPRICECHANGE_STEP = 10
+POSITIONTIMEDECAY = [ 60*60, 60*60*2]
+MINIMUMPRICECHANGE = [ 0.0002, 0.0004]
 
 class AcctStats(bt.Analyzer):
     
@@ -87,28 +75,16 @@ def optimization_params():
     args = dict()
 
     if OPTIMIZE_MA_PERIOD:
-        args.update({'ma_period': range(
-                MA_PERIOD_MIN, 
-                MA_PERIOD_MAX, 
-                MA_PERIOD_STEP)})
+        args.update({'ma_period': MA_PERIOD})
 
     if OPTIMIZE_STDDEV_PERIOD:
-        args.update({ 'stddev_period': range(
-                STDDEV_PERIOD_MIN,
-                STDDEV_PERIOD_MAX,
-                STDDEV_PERIOD_STEP)})
+        args.update({ 'stddev_period': STDDEV_PERIOD})
 
     if OPTIMIZE_STD_THRESHOLD:
-        args.update({'std_threshold': range(
-                STD_THRESHOLD_MIN,
-                STD_THRESHOLD_MAX,
-                STD_THRESHOLD_STEP)})
+        args.update({'std_threshold': STD_THRESHOLD})
 
     if OPTIMIZE_ATR_PERIOD:
-        args.update({'atr_period': range(
-                ATR_PERIOD_MIN,
-                ATR_PERIOD_MAX,
-                ATR_PERIOD_STEP)})
+        args.update({'atr_period': ATR_PERIOD})
 
     if OPTIMIZE_MP_VALUEAREA:
         args.update({ 'mp_valuearea': MP_VALUEAREA_RANGE })
@@ -123,16 +99,10 @@ def optimization_params():
         args.update({ 'takeprofit': TAKEPROFIT_RANGE })
 
     if OPTIMIZE_POSITIONTIMEDECAY:
-        args.update({ 'positiontimedecay': range(
-                POSITIONTIMEDECAY_MIN,
-                POSITIONTIMEDECAY_MAX,
-                POSITIONTIMEDECAY_STEP)})
+        args.update({ 'positiontimedecay': POSITIONTIMEDECAY})
 
     if OPTIMIZE_MINIMUMPRICECHANGE:
-        args.update({ 'minimumchangeprice': range(
-                POSITIONTIMEDECAY_MIN,
-                POSITIONTIMEDECAY_MAX,
-                POSITIONTIMEDECAY_STEP)})
+        args.update({ 'minimumchangeprice': MINIMUMPRICECHANGE})
 
     return args
 
@@ -144,7 +114,7 @@ def run_optimization(args=None, **kwargs):
 
     cerebro = bt.Cerebro()
     cerebro.broker.set_cash(10000.)
-    cerebro.broker.setcommission(0.02)
+    cerebro.broker.setcommission(0.002)
 
     data = btfeeds.GenericCSVData(
             dataname = args.data,
