@@ -147,7 +147,6 @@ class TradeSignalsHandler:
                 return True
         return False
 
-    #TODO
     def set_executed(self, st, direction):
         self._last_ordertime = st.datas[0].datetime.datetime(0)
         if direction == LONG:
@@ -176,7 +175,7 @@ class TradeSignalsHandler:
                 data, 
                 ticksize=self.ticksize,
                 valuearea=self.valuearea,
-                save_figs=SAVEFIGURES)
+                save_fig=SAVEFIGURES)
 
     def set_signal_mode(self, data):
         '''
@@ -202,10 +201,11 @@ class TradeSignalsHandler:
         market profile and close value to 
         sinalize a Long or Short signal or None signal
         '''
-        # Market Profile Range
-        #min_range, max_range = market_profile.open_range()
-        if self.market_profile is None:
+
+        if self.profile_slice is None:
             return NONE
+
+        # Market Profile Range
         min_range, max_range = self.profile_slice.open_range()
         # Market Profile Value Area
         val, vah = self.profile_slice.value_area
@@ -244,9 +244,6 @@ class TradeSignalsHandler:
         # Data Frame
         df = pd.DataFrame({
                 'Date': self.mp_gen_time,
-                #'Date':str(self.datas[0].datetime.datetime(0)),
-                #'Open':self.datas[0].open[0],
-                #'Open':data.open[0],
                 'Min Range': min_range,
                 'Max Range': max_range,
                 'VAL':val,
@@ -254,10 +251,18 @@ class TradeSignalsHandler:
                 'Long Mode': self._mode_for_long,
                 'Short Mode': self._mode_for_short,
                 }, index=[0])
+        if LOG:
+            print('[ Signal Mode ] \n'+
+                     tabulate(df, headers='keys', tablefmt='psql', showindex=False))
 
-        print('[ Signal Mode ] \n'+
-                tabulate(df, headers='keys', tablefmt='psql', showindex=False))
-
+    def reset(self):
+        '''Reset variables
+        '''
+        self._last_trade_high = None
+        self._last_trade_low = None
+        self._last_longprice = None
+        self._last_shortprice= None
+        self._last_ordertime = None
 
 class FadeSystemIB(bt.Strategy):
     '''
@@ -349,11 +354,9 @@ class FadeSystemIB(bt.Strategy):
                     self.params.std_threshold,
                     self.params.minimumchangeprice,
                     self.params.timebetweenorders)
-            #TODO rotina para zerar variaveis diarias
+            # Reset daily variables
             self._longdailyorders[_data] = 0
             self._shortdailyorders[_data] = 0
-
-
 
         ## Internal Vars
         # Order id (for backtrader only)
@@ -363,9 +366,6 @@ class FadeSystemIB(bt.Strategy):
         self._lastday = None
         self._newday = False
         self._lastordertime = dt.datetime(2000,1,1)
-
-        # Market Profile slice
-        #self._mp_slice = None
 
         # Open Orders List
         self.order_list = []
@@ -409,12 +409,8 @@ class FadeSystemIB(bt.Strategy):
             self._longdailyorders = 0
             self._shortdailyorders= 0
             self._positions_closed = False
-            ###TODO mudar, retirar para order handler
-            self._last_longprice = None
-            self._last_shortprice= None
-            #TODO precisa dessas vars?
-            self._last_trade_low = None
-            self._last_trade_high = None
+            for i in range(0, len(self.signals)-1, 1):
+                self.signals[i].reset()
 
         if now >= self.params.starttime and self._newday:
             self._newday = False
@@ -428,7 +424,6 @@ class FadeSystemIB(bt.Strategy):
             for _data in self.getdatanames():
 
                 # Get data from day before
-                #TODO parametro: getdatabyname()
                 data = self.parsedata(_data,
                             from_date=lastday_begin, 
                             to_date=lastday_end)
@@ -436,13 +431,6 @@ class FadeSystemIB(bt.Strategy):
                 # Plot data and orders
                 self.daily_plot(data, self._daily_orders, dataname=_data)
                 # Generate Market Profile
-                '''_mp, _mp_slice = generateprofiles(
-                        data, 
-                        ticksize=self.params.mp_ticksize,
-                        valuearea=self.params.mp_valuearea)
-                ''' 
-                #self.profilestatistics(self._mp_slice)
-                #self.set_signal_mode(self._mp_slice)
                 self.signals[_data].generate_mp(data)
                 self.signals[_data].set_signal_mode(self.getdatabyname(_data))
                 self.signals[_data].print_stats()
@@ -467,12 +455,8 @@ class FadeSystemIB(bt.Strategy):
         for _data in self.getdatanames():
             signal = NONE
             mp = self.signals[_data]
-            #TODO este check tem q ser dentro da função
-            if mp.profile_slice is not None:
-                signal = mp.lookforsignals(self.getdatabyname(_data), self.stddev[_data])
 
-            #if self._mp_slice is not None:
-            #    signal = self.lookforsignals(_data, self._mp_slice)
+            signal = mp.lookforsignals(self.getdatabyname(_data), self.stddev[_data])
 
             if signal is not NONE:
                 self.log('[ %s Signal ]' % signal)
@@ -490,7 +474,6 @@ class FadeSystemIB(bt.Strategy):
                         self.log('Minimum period between orders not reached %s ' % self.getdatabyname(_data).datetime.datetime(0))
                 else:
                     self.log('Max orders by day reached O:%s H:%s L:%s C:%s' %
-                            #TODO mudar para self.getdatabyname()
                             (self.getdatabyname(_data).open[0], self.getdatabyname(_data).high[0],
                             self.getdatabyname(_data).low[0], self.getdatabyname(_data).close[0]))
 
@@ -634,15 +617,6 @@ class FadeSystemIB(bt.Strategy):
         self.order_list.append(order)
         self._daily_orders.append(order)
 
-    #TODO funcao sem uso
-    def profilestatistics(self, profile_slice):
-        '''
-        Log a table with Market Profile Statistics
-        '''
-        profile_df = pd.DataFrame(profile_slice.as_dict(), index=[0])
-        self.log('[ Profile Statistics ] \n'+
-                tabulate(profile_df, headers='keys', tablefmt='psql', showindex=False))
-    
     def log(self, txt, dt=None):
         '''Print log messages and date
         '''
@@ -669,25 +643,16 @@ class FadeSystemIB(bt.Strategy):
             self._tradeid += 1
             self._lastordertime = self.datas[0].datetime.datetime(0)
 
-            # TODO
-            #self._last_trade_high = self.datas[1].high[0]
-            #self._last_trade_low = self.datas[1].low[0]
-
             if order.isbuy():
                 self._longdailyorders += 1
                 #TODO
-                #self._last_longprice = order.price
-                #self._last_longprice = self.datas[0].close[0]
             elif order.issell():
                 self._shortdailyorders += 1
                 #TODO
-                #self._last_shortprice = order.price
-                #self._last_shortprice = self.datas[0].close[0]
 
             df = pd.DataFrame({
                 'Order price': order.price,
                 'Order time':self._lastordertime,
-                #'Close':self.datas[0].close[0],
                 'Long daily orders':self._longdailyorders,
                 'Short daily orders':self._shortdailyorders,
                 }, index=[0])
