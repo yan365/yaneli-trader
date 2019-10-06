@@ -48,16 +48,20 @@ class OrderHandler:
     closed = False
     time_decay = None
 
-    def __init__(self, id, lots, side, symbol=''):
+    def __init__(self, id, lots, side, symbol):
         self._id = id
         self.symbol = symbol
         self.lot = lots
         self.side = side # LONG or SHORT
+
+        self.closed_time = None
+        self.closed_price = None
+        self.executed_time = None
+        self.executed_price = None
+
         # Internal vars
         self._stoploss = None # Absolute value of stop loss
         self._takeprofit = None
-        self.executed_time = None
-        self.executed_price = None
 
     def market_order(self, st):
         '''Execute market order with already given parameters
@@ -84,6 +88,7 @@ class OrderHandler:
         '''
         if self.side == LONG:
             self.order = st.buy(
+                    data= st.getdatabyname(self.symbol),
                     size = self.lot,
                     price = price,
                     exectype = Order.Limit,
@@ -92,6 +97,7 @@ class OrderHandler:
                     )
         elif self.side == SHORT:
             self.order = st.sell(
+                    data = st.getdatabyname(self.symbol),
                     size = self.lot,
                     price = price,
                     exectype = Order.Limit,
@@ -106,6 +112,7 @@ class OrderHandler:
         '''
         if self.side == LONG:
             self.order = st.buy(
+                    data = st.getdatabyname(self.symbol),
                     size = self.lot,
                     price = trigger_price,
                     exectype = Order.Stop,
@@ -114,6 +121,7 @@ class OrderHandler:
                     )
         elif self.side == SHORT:
             self.order = st.sell(
+                    data = st.getdatabyname(self.symbol),
                     size = self.lot,
                     price = trigger_price,
                     exectype = Order.Stop,
@@ -128,6 +136,7 @@ class OrderHandler:
         '''
         if self.side == LONG:
             self.order = st.buy(
+                    data = st.getdatabyname(self.symbol),
                     size = self.lot,
                     price = trigger_price,
                     pricelimit = limit_price,
@@ -137,6 +146,7 @@ class OrderHandler:
                     )
         elif self.side == SHORT:
             self.order = st.sell(
+                    data = st.getdatabyname(self.symbol),
                     size = self.lot,
                     price = trigger_price,
                     pricelimit = limit_price,
@@ -196,11 +206,12 @@ class OrderHandler:
         else:
             raise DirectionNotFound()
 
-    def check_stops(self, current_price):
+    def check_stops(self, bt):
         '''Check if stops is not none and compare
         with current price. Return True if any of stops
         is reached
         '''
+        current_price = bt.getdatabyname(self.symbol).close[0]
         if self._stoploss is not None:
             if self.side == LONG:
                 if current_price <= self._stoploss:
@@ -238,20 +249,25 @@ class OrderHandler:
         if self.executed:
             if self.side == LONG:
                 self.order = st.sell(
+                    data = st.getdatabyname(self.symbol),
                     size= self.lot,
                     price=None, 
                     exectype=Order.Market, 
-                    tradeid=self._id, 
+                    #TODO passar id para saber qnd foi fechada
+                    #tradeid=self._id, 
                         )
             elif self.side == SHORT:
                 self.order = st.buy(
+                    data = st.getdatabyname(self.symbol),
                     size= self.lot,
                     price=None, 
                     exectype=Order.Market, 
-                    tradeid=self._id, 
+                    #tradeid=self._id, 
                         )
             else:
                 raise DirectionNotFound()
+            #TODO
+            self.closed = True
 
     def set_timedecay(self, time=None):
         '''Configure time decay
@@ -272,19 +288,7 @@ class OrderHandler:
     def print_order(self):
         '''Print order variables to standard output
         '''
-        print(tabulate(pd.DataFrame({
-            'trade_id':str(self._id),
-            'lot':str(self.lot),
-            'side':self.side,
-            'symbol':self.symbol,
-            'executed':str(self.executed),
-            'executed price':str(self.executed_price),
-            'executed time':self.executed_time,
-            'stoploss':str(self._stoploss),
-            'takeprofit':str(self._takeprofit),
-            'time_decay':str(self.time_decay),
-            'closed':self.closed,
-            }, index=[0]), headers='keys', tablefmt='psql', showindex=False))
+        print(tabulate(self.as_dataframe(), headers='keys', tablefmt='psql', showindex=False))
 
     def as_dataframe(self):
         '''Return Data Frame with variables values
@@ -301,5 +305,5 @@ class OrderHandler:
             'takeprofit':str(self._takeprofit),
             'time_decay':str(self.time_decay),
             'closed':self.closed,
-            }, index=[0])
+            }, index=[self.symbol])
 
