@@ -11,28 +11,28 @@ INITIAL_CASH = 10000.
 COMMISSION = 0.002
 
 # Data Parameter
-DATAFILES = ['datafile1.csv', 'datafile2.csv', 'datafile3.csv']
+DATAFILES = ['eurusd.csv', 'audusd.csv']#, 'gbpusd.csv']
 
 # Strategy Parameters
 OPTIMIZE_MA_PERIOD = True
-OPTIMIZE_STDDEV_PERIOD = True
-OPTIMIZE_STD_THRESHOLD = False
-OPTIMIZE_ATR_PERIOD = True
+OPTIMIZE_STDDEV_PERIOD = False
+OPTIMIZE_STD_THRESHOLD = True
+OPTIMIZE_ATR_PERIOD = False
 OPTIMIZE_MP_VALUEAREA = False
 OPTIMIZE_MP_TICKSIZE = False
-OPTIMIZE_STOPLOSS = False
-OPTIMIZE_TAKEPROFIT = False
+OPTIMIZE_STOPLOSS = True
+OPTIMIZE_TAKEPROFIT = True
 OPTIMIZE_POSITIONTIMEDECAY = False
 OPTIMIZE_MINIMUMPRICECHANGE = False
 
-MA_PERIOD = [4, 8, 12, 16]
-STDDEV_PERIOD = [ 4, 8, 12, 16, 20]
-STD_THRESHOLD = [0.0004, 0.0008, 0.0012]
-ATR_PERIOD = [ 5, 10, 15, 20, 25]
+MA_PERIOD = [4]#[4, 8, 12, 16]
+STDDEV_PERIOD = [4]
+STD_THRESHOLD = [ 0.00007, 0.00005 ]
+ATR_PERIOD = [ 5,]
 MP_VALUEAREA_RANGE = [0.5]
 MP_TICKSIZE_RANGE = [0.2]
-STOPLOSS_RANGE = [0.02]
-TAKEPROFIT_RANGE = [0.02]
+STOPLOSS_RANGE = [0.02, 0.03]
+TAKEPROFIT_RANGE = [0.02, 0.03]
 POSITIONTIMEDECAY = [1000, 10000]
 MINIMUMPRICECHANGE = [ 0.0002]
 
@@ -77,7 +77,7 @@ def run_optimization(args=None, **kwargs):
     print('[ Configuring Cerebro ]')
     params = optimization_params()
     
-    cerebro = bt.Cerebro()
+    cerebro = bt.Cerebro(maxcpus=1)
     cerebro.broker.set_cash(INITIAL_CASH)
     cerebro.broker.setcommission(COMMISSION)
     

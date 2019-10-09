@@ -24,20 +24,26 @@ PORT = 7497
 CLIENTID = 1234
 
 STRATEGY_PARAMS = {
-        "lotsize":[1, 2, 3, 1, 2, 3],
+        "lotconfig": 1,
+        "std_threshold": 0.0005,
+        "stoploss": 0.0002,
+        "takeprofit": 0.0006,
+        # Indicators
         "ma_period": 8,
         "stddev_period":6,
         "atr_period":14,
+        # Market Profile
         "mp_valuearea": 0.6,
         "mp_ticksize":0.0002,
-        "stoploss":0.005,
-        "takeprofit":0.005,
+        # Time
         "starttime":dt.time(0, 0, 0),
         "orderfinaltime":dt.time(15,0,0),
         "timetocloseorders":dt.time(16,0,0),
         "timebetweenorders":dt.time(0,1,0),
+        # Position Time
         "positiontimedecay":60*60*2,
-        "minimumchangeprice":0.0003
+        # Position Filter
+        "minimumchangeprice":0.0007
         }
 
 
@@ -52,7 +58,9 @@ def run_live(args=None, **kwargs):
             "clientId":CLIENTID,
             "notifyall":True,
             "reconnect":100,
-            "timeout":2.0
+            "timeout":2.0,
+            "timerefresh":10,
+            "_debug":False,
             }
 
     ibstore = bt.stores.IBStore(**broker_args)
@@ -64,6 +72,9 @@ def run_live(args=None, **kwargs):
                 "dataname": dataname,
                 "timeframe": bt.TimeFrame.Minutes,
                 "compression": 1,
+                #"historical":False,
+                #"fromdate":dt.datetime(2019,10,1),
+                #"todate":dt.datetime(2019,10,7)
                 }
         data = ibstore.getdata(**data_args)
         print("[ Add Data ] %s" % dataname)
@@ -74,12 +85,22 @@ def run_live(args=None, **kwargs):
         data_args = {
                 "dataname": dataname,
                 "timeframe": bt.TimeFrame.Minutes,
-                "compression": 5,
+                "compression": 1,
+                "historical":False,
+                "fromdate":dt.datetime(2019,10,1),
+                "todate":dt.datetime(2019,10,7)
                 }
+        data = ibstore.getdata(**data_args)
+        print("[ Add Data ] %s" % dataname)
+        cerebro.adddata(data)
+
 
     cerebro.addstrategy(FadeSystemIB, **STRATEGY_PARAMS)
 
     cerebro.run()
 
     cerebro.plot()
+
+if __name__ == '__main__':
+    run_live()
 

@@ -300,7 +300,7 @@ class OrderHandler:
             'symbol':self.symbol,
             'executed':str(self.executed),
             'executed price':str(self.executed_price),
-            'executed time':self.executed_time,
+            'executed_time':str(self.executed_time),
             'stoploss':str(self._stoploss),
             'takeprofit':str(self._takeprofit),
             'time_decay':str(self.time_decay),
