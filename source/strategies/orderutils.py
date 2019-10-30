@@ -3,17 +3,21 @@
 from backtrader.order import Order
 import pandas as pd
 from tabulate import tabulate
+from strategies.exceptions import *
 
 NONE = 'None'
 LONG = 'Long'
 SHORT = 'Short'
 
 PERCENT = 'Percent'
-TICK = 'Tick'
+VALUE = 'Value'
+PRICE = 'Price'
 
-def calc_stops(price, side, stoploss, takeprofit, mode=TICK):
+def calc_stops(price, side, stoploss, takeprofit, mode=VALUE,
+        lots=None):
     '''Calculate Stop Loss and Take Profit based on price and
-    method for calculation: percentage or ticks
+    method for calculation: percentage or ticks.
+    Parameter lots is used for VALUE mode only
 
     return: StopLoss, TakeProfit
     '''
@@ -25,15 +29,27 @@ def calc_stops(price, side, stoploss, takeprofit, mode=TICK):
         else:
             raise DirectionNotFound()
 
-    elif mode == TICK:
+    elif mode == PRICE:
         if side == LONG:
             return (price - stoploss) , (price + takeprofit)
         elif side == SHORT:
             return (price + stoploss), (price - takeprofit)
         else:
             raise DirectionNotFound()
+
+    elif mode == VALUE:
+        if lots == None:
+            raise StopCalculationError()
+            return None, None
+        if side == LONG:
+            return (price * lots - stoploss), (price * lots + takeprofit)
+        elif side == SHORT:
+            return (price * lots + stoploss), (price * lots - takeprofit)
+        else:
+            raise DirectionNotFound()
     else:
         raise TradeModeNotFound()
+
     return None, None
 
 class OrderHandler:

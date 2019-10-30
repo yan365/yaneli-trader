@@ -184,6 +184,10 @@ class IBDataClient:
     def positions(self):
         print(self.client.positions())
 
+    def gettickers(self, contract):
+        self.client.reqMktData(contract)
+        print(self.client.tickers())
+
     def close(self):
         self.client.disconnect()
 
