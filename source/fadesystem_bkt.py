@@ -7,30 +7,27 @@ import backtrader.analyzers as analyzer
 import argparse
 from strategies.fadesystem import FadeSystemIB
 
-# Strategy Parameters
-SYMBOL = 'EUR.USD-CASH-IDEALPRO'
-INIT_DATE = dt.datetime(2014,1,1)
-END_DATE = dt.datetime(2018,1,1)
+# Data Parameter
+DEFAULT_FILE = 'dataname.csv'
+TICK_SIZE = 0.01
+
+# Strategy Default Parameters
 MA_PERIOD = 5
 STD_PERIOD = 8
-
-# IB Parameters
-HOST = '127.0.0.1'
-PORT = 7497  # Live: 7496 
-CLIENTID = 1234
-
 
 def parse_args(pargs=None):
     parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             description='IB Strategy')
-    
     parser.add_argument(
-            '--symbol', '-s',
-            required=False, 
-            default = SYMBOL, 
-            help='Symbol to be used')
-    
+            '--data', '-d',
+            required=False,
+            default=DEFAULT_FILE,
+            action='store',
+            type=str,
+            help='File name'
+            )
+
     parser.add_argument(
             '--ma_period', '-p',
             required=False,
@@ -53,45 +50,42 @@ def parse_args(pargs=None):
 
 
 def run_strategy(args=None, **kwargs):
+
     print('[ Configuring Cerebro ]')
     args = parse_args(args)
     
-    cerebro = bt.Cerebro(
-            #maxcpus=1, 
-            live=False)
+    cerebro = bt.Cerebro()
     
-    broker_args = {
-        "host":HOST,
-        "port":PORT,
-        "clientId":CLIENTID,
-        "notifyall":True, 
-        "_debug":True,
-        "reconnect":3,
-        "timeout":2.0,
-    }
-
-    ibstore = bt.stores.IBStore(**broker_args)
-    cerebro.setbroker(ibstore.getbroker())
-
-    data_args = {
-        "dataname":args.symbol,
-        "fromdate":INIT_DATE,
-        "todate":END_DATE,
-        #"sessionstart":,
-        #"sessionend":,
-        "timeframe":bt.TimeFrame.Seconds,
-        "compression":1,
-        "historical":True
-    }
-
-    data_args.update(**kwargs)
-
-    data = ibstore.getdata(**data_args)
+    data = btfeeds.GenericCSVData(
+            dataname = args.data,
+            nullvalue = 0., 
+            dtformat = ('%Y-%m-%d %H:%M:%S'),
+            date = 0,
+            open = 1,
+            high = 2,
+            low = 3,
+            close = 4,
+            volume = 5,
+            timeframe = bt.TimeFrame.Ticks,
+            )
     
     cerebro.adddata(data)
+
     cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=5)
 
-    cerebro.addstrategy(FadeSystemIB, ma_period=args.ma_period, stddev_period=args.std_period)
+    strategy_args = {
+            'ma_period':10,
+            'stddev_period':10,
+            'std_threshold':0.0004,
+            'mp_valuearea':0.7,
+            'mp_ticksize':0.0002,
+            'stoploss':0.005,
+            'takeprofit':0.005,
+            'positiontimedecay':60*5,
+            'minimumchangeprice':0.0003, 
+            }
+
+    cerebro.addstrategy(FadeSystemIB, **strategy_args)
 
     cerebro.addanalyzer(analyzer.DrawDown, _name='drawdown')
     cerebro.addanalyzer(analyzer.SharpeRatio, _name='sharpe', timeframe=bt.TimeFrame.Weeks)
@@ -110,6 +104,7 @@ def run_strategy(args=None, **kwargs):
     print('Cash: %.2f' % cerebro.broker.getcash())
 
     print('[ Ploting ]')
+
     cerebro.plot(
             volume=True,
             stdstats=True,

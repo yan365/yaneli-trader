@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 
+import pandas as pd
+import matplotlib.pyplot as plt
+import datetime as dt
+from market_profile import MarketProfile, MarketProfileSlice
+
 def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7, 
-        mp_mode='tpo', save_fig=True):
+        mp_mode='tpo', save_fig=True, name=''):
     '''Generate Market Profile from pandas Data Frame
 
     Params:
@@ -19,6 +24,9 @@ def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7,
 
         -save_fig (default: True)
         Create and save the Market Profile chart
+
+        -name (default: '')
+        Optional argument for prefix name
     '''
 
     # Generate Market Profile
@@ -41,10 +49,11 @@ def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7,
         plt.axhline(y=vah, color='blue', linestyle= '-')
         plt.plot(dataframe['Open'].iloc[0], color='red', marker='o')
         fig = profile.plot(kind='barh')
-        fig.figure.savefig(
-                str(mp_mode+dataframe['datetime'].iloc[
-                    dataframe['datetime'].size-1]).
-                replace(' ','_').replace(':','')+'.png')
+        filename = name+'_'+mp_mode+'_'+str(dataframe['datetime'].iloc[
+                    dataframe['datetime'].size-1])+'_'+\
+                    str(dataframe['datetime'].iloc[0])
+        filename.replace(' ','_').replace(':','').replace('.','')+'.png'
+        fig.figure.savefig(filename)
     return profile, mp_slice
 
 def parsedata(data, from_date=None, to_date=None, size_limit=60*60*24):
@@ -56,7 +65,6 @@ def parsedata(data, from_date=None, to_date=None, size_limit=60*60*24):
     timestamp = []
     datetime = []
     
-    #data = st.getdatabyname(dataname)
     # Define maximum size of data
     _size = size_limit if len(data) > size_limit else len(data)
 
@@ -98,6 +106,36 @@ def parsedata(data, from_date=None, to_date=None, size_limit=60*60*24):
 
     return dataframe
 
+def parsedataframe(dataframe, from_date=None, to_date=None, size_limit=60*60*24):
+    '''Get data from backtrader cerebro and convert
+    in a pandas dataframe. The columns names are changed for
+    compatibility with Market Profile library. The dataframe 
+    can be filtered by date and size.
+    '''
+    timestamp = []
+    datetime = []
+    
+    # Define maximum size of data
+    _size = size_limit if dataframe.size > size_limit else dataframe.size
+    
+
+    dataframe['Close'] = dataframe['Close'].astype('float')
+    #dataframe['Volume'] = dataframe['Volume'].astype('float')
+
+    # To work properly with Market Profile library
+    dataframe['datetime'] = pd.to_datetime(dataframe['datetime'],
+            format = '%Y-%m-%d %H:%M:%S', 
+            infer_datetime_format=True).dt.strftime('%Y%m%d %H:%M')
+    dataframe=dataframe.set_index('datetime',drop=False)
+    dataframe.index = pd.to_datetime(dataframe.index)
+
+    # Filter by date
+    if from_date is not None:
+        dataframe = dataframe.query('timestamp >= %s' % str(from_date))
+    if to_date is not None:
+        dataframe = dataframe.query('timestamp <= %s' % str(to_date))
+
+    return dataframe
 
 def save_data(dataframe, output_filename='out.csv', sep=',', **kwargs):
     args = {
@@ -109,15 +147,14 @@ def save_data(dataframe, output_filename='out.csv', sep=',', **kwargs):
     args.update(kwargs)
     dataframe.to_csv(**args)
 
-def plot_close(data, orders, dataname=''):
+def plot_orders(data, orders, dataname='plotdata'):
     '''Plot close data with orders parameters
     '''
-    title = dataname+str(data['datetime'].iloc[\
-            data['datetime'].size-1]).\
-            replace(' ','_').replace(':','')
+    title = dataname
+
     plt.clf()
     plt.plot(data['Close'], linewidth=1)
-    plt.title(title)
+    plt.title([title])
     plt.grid(True)
     plt.ylabel('Close')
     plt.xlabel('Time')
@@ -140,7 +177,8 @@ def plot_close(data, orders, dataname=''):
             if order._takeprofit is not None:
                 plt.plot(order.executed_time, order._takeprofit, '_', color= _color)
     
-    plt.savefig(title+'.png')
+    #TODO save figure
+    #plt.show()
 
 def plot_data(dataframe, y_axis='close', **kwargs):
     args = {

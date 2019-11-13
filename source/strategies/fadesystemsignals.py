@@ -5,39 +5,56 @@ import datautils as du
 from optparams import *
 import datetime as dt
 
-LOTS_CONFIGURATION = [
-        [1,2,3,1,2,3],
-        [1,2,3,4,5,6],
-        ]
+# Mode of trading signals
+BELOW_RANGE = 'Below Range'
+BELOW_VAL = 'Below VAL'
+ABOVE_VAH = 'Above VAH'
+ABOVE_RANGE = 'Above Range'
 
-class TradeSignalsHandler:
+class TradeSignalsHandler(object):
+    '''This class handles the signals rules for Fade System Strategy.
+    The functions 'next', 'generate_mp', 'set_signal_mode' and 'reset'
+    must be called by the algorithm running the instance of this class.
+ 
+    Parameters:
 
-    market_profile = None
-    profile_slice = None
+       - dataname 
 
-    lot_configuration = None
+       - std_threshold
 
-    std_threshold = 0.
-    min_pricechange = 0.
+       - min_pricechange
 
-    last_orderid = -1
+       - ticksize
 
-    minimum_order_time = 60*10 # Minimum time to send another order
+       Minimum price change for sending another signal. The value can be None, which means that this rule is deactivated
 
-    def __init__(self, dataname, lot_index, stoploss_index, 
-            takeprofit_index, valuearea, ticksize_index, std_threshold_index,
-            min_pricechange_index, min_ordertime):
+       - valuearea (default: 0.7)
+
+       The Value Area parameter for generating Market Profiles
+
+       - signals_interval (default: 60*5)
+
+       Minimum time in seconds for sending another signal
+
+    '''
+
+    def __init__(self, dataname, std_threshold, min_pricechange, ticksize, valuearea=0.7, signals_interval = 60*5):
         
-        self.dataname = dataname
-        self.lot_configuration = LOTS_CONFIGURATION[lot_index]
-        self.ticksize = MP_TICKSIZE_CONFIGURATION[ticksize_index][dataname]
-        self.stoploss = STOP_LOSS_CONFIGURATION[stoploss_index][dataname]
-        self.takeprofit = TAKE_PROFIT_CONFIGURATION[takeprofit_index][dataname]
+        self.dataname = str(dataname)
 
-        self.valuearea = valuearea
-        self.std_threshold = STD_THRESHOLD_CONFIGURATION[std_threshold_index][dataname]
+        self.valuearea = float(valuearea)
+        
+        self.std_threshold = float(std_threshold)
 
-        self.min_pricechange = MINIMUM_PRICE_CONFIGURATION[min_pricechange_index][dataname]
+        self.min_pricechange = float(min_pricechange)
+
+        self.ticksize = float(ticksize)
+    
+        self.signals_time_interval = signals_interval
+
+        # Market Profile
+        self.market_profile = None
+        self.profile_slice = None
 
         # Trade mode
         self._mode_for_long = NONE
@@ -51,123 +68,100 @@ class TradeSignalsHandler:
         self._last_longprice = None
         self._last_shortprice= None
 
-        self._last_ordertime = None
-
-        self.min_ordertime = min_ordertime
-
         # Market Profile generated time
-        self.mp_gen_time = None
+        self._mp_gen_time = None
+    
+        self._last_signal_time = None
 
-        self._long_daily_orders = 0
-        self._short_daily_orders = 0
+    def next(self, datetime, std_value, open, high, low, close):
+        '''This function should be called every time new data
+        '''
+        self.now = datetime
+        self.std = std_value
+        self.open = open
+        self.high = high
+        self.low = low
+        self.close = close
 
-        self._last_order_time = pd.Timestamp(dt.datetime.now())
+    def check_last_mp_time(self):
+        '''Check if Market Profile was generated in the last day
+        '''
+        return True
 
-    def check_std_dev(self, st):
+    def check_parameters(self):
+        '''Check if parameters don't break any rule for this signal handler
+        '''
+        pass
+
+    def check_std_dev(self):
         '''Check if current value of Standard Deviation indicator
         is equal or greater than Standard Deviation Threshold
         '''
-        return (st.stddev[self.dataname][0] >= self.std_threshold)
-    
-    def check_new_highlow(self, st, signal):
+        return (self.std >= self.std_threshold)
 
-        if signal == NONE:
-            return False
-
-        elif signal == SHORT:
-            if self._last_trade_high is None:
-                return True
-
-            if self._last_trade_high < st.getdatabyname(self.dataname).high[0]:
-                return True
-
-        elif signal == LONG:
-            if self._last_trade_low is None:
-                return True
-
-            if self._last_trade_low < st.getdatabyname(self.dataname).low[0]:
-                return True
-
-        else:
-            raise DirectionNotFound()
-
+    def check_new_high(self):
+        '''For sending another Short signal the strategy require
+        the current close price be higher than price of last signal
+        '''
+        if self._last_trade_high is None:
+            return True
+        if self._last_trade_high < self.close:
+            return True
         return False
     
-    def check_last_order_price(self, st, signal):
-        '''Compare current price with last order
+    def check_new_low(self):
+        '''For sending another Long signal the strategy require
+        the current close price be lower than price of last signal
+        '''
+        if self._last_trade_low is None:
+            return True
+        if self._last_trade_low < self.close:
+            return True
+        return False
+    
+    def check_last_order_price(self, signal):
+        '''Compare current price with last order and check if reached
+        the minimum price change parameter
         '''
         if signal == LONG:
+            # if parameter is empty don't need to check
             if self._last_longprice == None:
                 return True
 
-            if self._last_longprice - st.getdatabyname(self.dataname).close[0]  >= self.min_pricechange:
-                return True
+            if self._last_longprice - self.close  <= self.min_pricechange:
+                return False
 
         elif signal == SHORT:
+            # if parameter is empty don't need to check
             if self._last_shortprice == None:
                 return True
 
-            if st.getdatabyname(self.dataname).close[0] - self._last_shortprice >= self.min_pricechange:
-                return True
-        return False
+            if self.close - self._last_shortprice <= self.min_pricechange:                
+                return False
+        return True
 
-    def set_executed(self, st, direction):
-
-        self._last_ordertime = st.datas[0].datetime.datetime(0)
-        if direction == LONG:
-            self._last_longprice = st.getdatabyname(self.dataname).close[0]
-            self._last_trade_low =  st.getdatabyname(self.dataname).low[0]
-            self._long_daily_orders += 1
-
-        elif direction == SHORT:
-            self._last_shortprice = st.getdatabyname(self.dataname).close[0]
-            self._last_trade_high = st.getdatabyname(self.dataname).high[0]
-            self._short_daily_orders += 1
-
-    def check_last_order_time(self, st):
+    def check_last_signal_time(self):
         '''Minimum time for opening a new position
         '''
-        if self._last_ordertime is None:
+        if self._last_signal_time is None:
             return True
-        if pd.Timestamp(st.datas[0].datetime.datetime(0)) \
-                - pd.Timestamp(self._last_ordertime) \
-                <= dt.timedelta(hours=st.params.timebetweenorders.hour,
-                        minutes=st.params.timebetweenorders.minute):
+        if self.now - self._last_signal_time <= dt.timedelta(seconds=self.signals_time_interval):
             return False
         return True
 
-    def check_orders_limit(self, signal):
-        '''The limit number of orders for a specific direction 
-        is the number of elements in list received by input
-        parameter lotconfig
-        '''
-        if signal == LONG:
-            if len(self.lot_configuration)-1 < self._long_daily_orders:
-                return False
-        elif signal == SHORT:
-            if len(self.lot_configuration)-1 < self._short_daily_orders:
-                return False
-        return True
-
-    def get_lot_size(self, signal):
-        '''Get the element in the list with the size of lots
-        '''
-        if signal == LONG:
-            return self.lot_configuration[self._long_daily_orders]
-        elif signal == SHORT:
-            return self.lot_configuration[self._short_daily_orders]
-
     def generate_mp(self, data):
-        '''Generate Market Profile
+        '''Generate Market Profile. The signal handler need this function 
+        to be called every beginning of cycle. This function is not 
+        called internally.
         '''
-        self.mp_gen_time = data['datetime'][0]
-        self.market_profile, self.profile_slice = generateprofiles(
+        self._mp_gen_time = data['datetime'][0]
+        self.market_profile, self.profile_slice = du.generateprofiles(
                 data, 
                 ticksize=self.ticksize,
                 valuearea=self.valuearea,
-                save_fig=SAVEFIGURES)
+                save_fig=True)
 
-    def set_signal_mode(self, data):
+    def set_signal_mode(self):
         '''
         Switches the mode for catching signals for Long and Short.
         This function is called after Market Profile is
@@ -175,45 +169,55 @@ class TradeSignalsHandler:
         '''
         val, vah = self.profile_slice.value_area
 
-        if data.open[0] >= vah:
+        if self.open >= vah:
            self._mode_for_short = ABOVE_RANGE
         else:
             self._mode_for_short = ABOVE_VAH
 
-        if data.open[0] <= val:
+        if self.open <= val:
             self._mode_for_long = BELOW_RANGE
         else:
             self._mode_for_long = BELOW_VAL
 
-    def checksignals(self, st):
+    def checksignals(self):
+        if not self.check_last_signal_time():
+            return NONE
 
-        mp_signal = self.mpsignal(st.getdatabyname(self.dataname))
-        if self.check_std_dev(st):
+        if self.check_std_dev():
+
+            mp_signal = self.mpsignal()
 
             conditions = {
                     'Symbol': self.dataname,
                     'Signal': mp_signal,
-                    'Last Order Time': self.check_last_order_time(st),
-                    'Last Order Price': self.check_last_order_price(st, mp_signal),
-                    'New High/Low': self.check_new_highlow(st, mp_signal),
-                    'Orders Limit': self.check_orders_limit(mp_signal)
+                    'Last Order Price': self.check_last_order_price(mp_signal),
+                    'New High': self.check_new_high(),
+                    'New Low': self.check_new_low(),
+                    'MP Generated Time':str(self._mp_gen_time),
                     }
 
-            if LOG: print(str(conditions))
+            #print(str(conditions))
 
             if False in conditions.values():
                 return NONE
             else:
-                self._last_order_time = pd.Timestamp(dt.datetime.now())
+                self._last_signal_time = self.now
+
+                if mp_signal == LONG:
+                    self._last_longprice = self.close
+                    self._last_trade_low = self.close
+
+                elif mp_signal == SHORT:
+                    self._last_shortprice = self.close
+                    self._last_trade_high = self.close
+
                 return mp_signal
+
         return NONE
 
-
-    def mpsignal(self, data):
-        '''
-        Check the current mode of trade, indicators,
-        market profile and close value to 
-        sinalize a Long or Short signal or None signal
+    def mpsignal(self):
+        '''Check the current mode of trade, market profile and close 
+        value to sinalize a Long or Short signal or None signal
         '''
 
         if self.profile_slice is None:
@@ -221,36 +225,36 @@ class TradeSignalsHandler:
 
         # Market Profile Range
         min_range, max_range = self.profile_slice.open_range()
+
         # Market Profile Value Area
         val, vah = self.profile_slice.value_area
 
         # Long signal
         if self._mode_for_long == BELOW_VAL:
-            if data.close[0] < val:
+            if self.close < val:
                 return LONG
 
         elif self._mode_for_long == BELOW_RANGE:
-            if data.close[0] < min_range:
+            if self.close < min_range:
                 return LONG
         else:
             raise TradeModeNotFound()
 
         # Short signal
         if self._mode_for_short == ABOVE_VAH:
-            if data.close[0] > vah:
+            if self.close > vah:
                 return SHORT
 
         elif self._mode_for_short == ABOVE_RANGE:
-            if data.close[0] > max_range:
+            if self.close > max_range:
                 return SHORT
-
         else:
             raise TradeModeNotFound()
         return NONE
 
     def print_status(self):
-        if not LOG:
-            return
+        '''Print status of this signal handler.
+        '''
         val, vah = self.profile_slice.value_area
         min_range, max_range = self.profile_slice.open_range()
         
@@ -261,12 +265,11 @@ class TradeSignalsHandler:
                 'Minimum Price':self.min_pricechange,
                 'MP Tick Size':self.ticksize,
                 'MP Value Area':self.valuearea,
-                'Lots':str(self.lot_configuration)
             }, index=[0])
 
         # Market Profile Info
         df_mp = pd.DataFrame({
-                'Date': self.mp_gen_time,
+                'Date': self._mp_gen_time,
                 'Min Range': min_range,
                 'Max Range': max_range,
                 'VAL':val,
@@ -275,27 +278,35 @@ class TradeSignalsHandler:
                 'Short Mode': self._mode_for_short,
                 }, index=[0])
 
+        df_status = pd.DataFrame({
+            'Std Dev':self.std,
+            'Open':self.open,
+            'High':self.high,
+            'Low':self.low,
+            'Close':self.close,
+            }, index=[0])
+
         # Orders Info
         df_order = pd.DataFrame({
                 'Last Trade High':self._last_trade_high,
                 'Last Trade Low':self._last_trade_low,
                 'Last Long Price':self._last_longprice,
                 'Last Short Price':self._last_shortprice,
-                'Last Order Time':self._last_ordertime,
+                'Last Signal Time':self._last_signal_time,
                 }, index=[0])
 
         print('[ Signal Mode ] \n'+
                  tabulate(df_st, headers='keys', tablefmt='psql', showindex=False)+'\n',
                  tabulate(df_mp, headers='keys', tablefmt='psql', showindex=False)+'\n',
+                 tabulate(df_status, headers='keys', tablefmt='psql', showindex=False)+'\n',
                  tabulate(df_order, headers='keys', tablefmt='psql', showindex=False))
 
     def reset(self):
-        '''Reset variables
+        '''Reset variables. This function depends on the signal handler
+        cycle period. This function is not called internally.
         '''
         self._last_trade_high = None
         self._last_trade_low = None
         self._last_longprice = None
         self._last_shortprice= None
-        self._long_daily_orders = 0
-        self._short_daily_orders = 0
 
