@@ -632,6 +632,8 @@ class OrderHandler(object):
         self._filled_price = None 
         if datetime == None:
             self._created_time = dt.datetime.now()
+        else:
+            self._created_time = datetime
 
     def check_stops(self, close):
         '''Check if stops is not none and compare
