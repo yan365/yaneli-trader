@@ -12,9 +12,9 @@ from tabulate import tabulate
 from market_profile import MarketProfile
 
 from datautils import *
-from strategies.orderutils import *
+from orderutils import *
 from strategies.fadesystemsignals import *
-from optparams import *
+from strategies.optparams import *
 
 from strategies.exceptions import DirectionNotFound, TradeModeNotFound, OrderNotExecuted
 
@@ -224,16 +224,16 @@ class FadeSystemIB(bt.Strategy):
 
         for _data in self.getdatanames():
             # Check Trade Signals
-            signal = self.signals[_data].checksignals(self)
+            signal = self.signals[_data].checksignals()
 
             if str(signal) != str(NONE):
                 # Get lot size 
                 if str(signal) == LONG:
-                    lots = self.order_management.lot_configuration[
+                    lots = self.lot_config[
                         self.order_management.long_daily_orders]
 
                 elif str(signal) == SHORT:
-                    lots = self.order_management.lot_configuration[
+                    lots = self.lot_config[
                         self.order_management.short_daily_orders]
 
                 self.log('[ %s Signal ] %s Lots: %s' % (signal, _data, lots))
@@ -249,14 +249,19 @@ class FadeSystemIB(bt.Strategy):
                 self._tradeid,
                 lots = lots,
                 side = signal,
-                symbol = dataname
+                symbol = dataname,
+                datetime = self.datas[0].datetime.datetime(0)
                 )
 
         self.signals[dataname].last_orderid = self._tradeid
+        self._tradeid += 1
+
         # Order parameters
         order.set_timedecay(self.params.positiontimedecay)
         #TODO remove
-        order.set_stops(calc_stops(order.side, 0.01, 0.01, mode=PERCENT))
+        sl, tp = calc_stops(self.getdatabyname(dataname).close[0], 
+                order.side, 0.01, 0.01, mode=PERCENT)
+        order.set_stops(sl, tp)
         order.print_order()
 
         # Send the order to the Order Management object
@@ -287,7 +292,6 @@ class FadeSystemIB(bt.Strategy):
 
         if order.status == order.Completed:
             self.log('Order [%d] Completed' % order.tradeid)
-            self._tradeid += 1
 
             self.order_management.set_executed(order.tradeid, self.getdatabyname(order.data), self.datas[0].datetime.datetime(0))
             self.order_management.update_orders()
@@ -347,11 +351,7 @@ class FadeSystemIB(bt.Strategy):
             return
         self._last_cron_time = time
 
-        df = self.order_management.show_orders_number()
-
-        self.log('[ CRON Report ] \n'+
-                tabulate(df, headers='keys', 
-                    tablefmt='psql', showindex=False))
+        self.log('[ CRON Report ]')
 
         for _data in self.getdatanames():
             dataframe = pd.DataFrame({

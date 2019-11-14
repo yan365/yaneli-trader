@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from strategies.orderutils import *
+from orderutils import *
 import datautils as du
-from optparams import *
+from strategies.optparams import *
 import datetime as dt
 
 # Mode of trading signals

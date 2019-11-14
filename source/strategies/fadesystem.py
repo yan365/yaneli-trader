@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from tabulate import tabulate
 from market_profile import MarketProfile
 
-from strategies.orderutils import *
+from orderutils import *
 from datautils import *
 from strategies.fadesystemsignals import *
 
@@ -229,9 +229,12 @@ class FadeSystemIB(bt.Strategy):
                 self._tradeid,
                 lots = lots,
                 side = signal, 
-                symbol = dataname)
+                symbol = dataname,
+                dateteime = self.datas[0].datetime.datetime(0))
 
         self.signals_handler.last_orderid = self._tradeid
+        self._tradeid += 1
+
         # Order parameters
         order.set_timedecay(self.params.positiontimedecay)
         #TODO remove and configure stops based on PnL
@@ -266,7 +269,6 @@ class FadeSystemIB(bt.Strategy):
 
         if order.status == order.Completed:
             self.log('Order [%d] Completed' % order.tradeid)
-            self._tradeid += 1
 
             self.order_management.set_executed(order.tradeid, self.datas[0].close[0], self.datas[0].datetime.datetime(0))
             self.order_management.update_orders()

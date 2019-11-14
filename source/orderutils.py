@@ -428,7 +428,7 @@ class OrdersManagement(object):
     def show_orders_number(self):
         '''Show the open orders number and the closed orders number.
         '''
-        if dataclient != None:
+        if self.dataclient != None:
             #TODO
             return 0
         else:
@@ -490,7 +490,8 @@ class OrdersManagement(object):
             for order in self.order_history:
                 order_his = order_his.append(order.as_dataframe())
         output_fn = 'closed_orders_'+str(pd.Timestamp(dt.datetime.now())).replace('-','').replace(' ', '').replace(':','')+'.csv'
-        du.save_data(dataframe=order_his, output_filename=output_fn)
+        if order_his.size > 0:
+            du.save_data(dataframe=order_his, output_filename=output_fn)
 
 
     def stop_order(self, order, trigger_price, valid = None):
@@ -611,7 +612,7 @@ class OrderHandler(object):
        - symbol
     '''
 
-    def __init__(self, id, lots, side, symbol):
+    def __init__(self, id, lots, side, symbol, datetime=None):
 
         self._id = id
         self.symbol = symbol
@@ -629,6 +630,8 @@ class OrderHandler(object):
         self._takeprofit = None
         self._filled_time = None
         self._filled_price = None 
+        if datetime == None:
+            self._created_time = dt.datetime.now()
 
     def check_stops(self, close):
         '''Check if stops is not none and compare
@@ -699,6 +702,7 @@ class OrderHandler(object):
             'executed':str(self.executed),
             'executed price':str(self._filled_price),
             'executed_time':str(self._filled_time),
+            'created_time':str(self._created_time),
             'stoploss':str(self._stoploss),
             'takeprofit':str(self._takeprofit),
             'time_decay':str(self.time_decay),

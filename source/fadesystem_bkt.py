@@ -6,44 +6,111 @@ import backtrader.feeds as btfeeds
 import backtrader.analyzers as analyzer
 import argparse
 from strategies.fadesystem import FadeSystemIB
+import datautils
+from dataclient import *
+from ib_insync import *
 
-# Data Parameter
-DEFAULT_FILE = 'dataname.csv'
-TICK_SIZE = 0.01
+# IB Parameters
+HOST = '127.0.0.1'
+PORT = 7497
+CLIENTID = 1234
+
+# CSV data file name
+DATANAME = 'EURUSD'
+
+# Data Parameters
+DOWNLOAD_DATA = False
+CONTRACT = Forex('EURUSD', 'IDEALPRO', 'EUR') 
+DATA_TIMEFRAME = '1 min'
+DATA_DURATION = '20 D'
 
 # Strategy Default Parameters
 MA_PERIOD = 5
 STD_PERIOD = 8
+STD_THRESHOLD = 0.00008
+STOPLOSS = 3000
+TAKEPROFIT = 3000
+MP_VALUEAREA = 0.75
+POSITION_TIME_DECAY = 60*60
+MINIMUM_PRICE_CHANGE = 0.0001
 
 def parse_args(pargs=None):
     parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             description='IB Strategy')
-    parser.add_argument(
-            '--data', '-d',
-            required=False,
-            default=DEFAULT_FILE,
-            action='store',
-            type=str,
-            help='File name'
-            )
 
     parser.add_argument(
-            '--ma_period', '-p',
+            '--ma_period', '-ma',
             required=False,
             default=MA_PERIOD,
             action='store',
             type=int,
             help='Moving Average period'
             )
+
     parser.add_argument(
-            '--std_period', '-t',
+            '--std_period', '-std',
             required=False,
             default=STD_PERIOD,
             action='store',
             type=int,
             help='Standard Deviation period'
             )
+    
+    parser.add_argument(
+            '--std_threshold', '-thr',
+            required=False,
+            default=STD_THRESHOLD,
+            action='store',
+            type=float,
+            help='Standard Deviation THRESHOLD'
+            )
+
+    parser.add_argument(
+            '--stoploss', '-stop',
+            required=False,
+            default=STOPLOSS,
+            action='store',
+            type=float,
+            help='Stop Loss'
+            )
+    
+    parser.add_argument(
+            '--takeprofit', '-take',
+            required=False,
+            default=TAKEPROFIT,
+            action='store',
+            type=float,
+            help='Take Profit'
+            )
+    
+    parser.add_argument(
+            '--value_area', '-va',
+            required=False,
+            default=MP_VALUEAREA,
+            action='store',
+            type=float,
+            help='Market Profile Value Area'
+            )
+    
+    parser.add_argument(
+            '--time_decay', '-td',
+            required=False,
+            default=POSITION_TIME_DECAY,
+            action='store',
+            type=int,
+            help='Time Decay of the position'
+            )
+    
+    parser.add_argument(
+            '--minimum_price', '-mp',
+            required=False,
+            default=MINIMUM_PRICE_CHANGE,
+            action='store',
+            type=int,
+            help='Minimum price change for opening a new order'
+            )
+
     if pargs is not None:
         return parser.parse_args(pargs)
     return parser.parse_args()
@@ -53,11 +120,25 @@ def run_strategy(args=None, **kwargs):
 
     print('[ Configuring Cerebro ]')
     args = parse_args(args)
+
+    dataclient = IBDataClient(HOST, PORT, CLIENTID)
+    
+    ticksize = dataclient.getticksize(CONTRACT)
+    if DOWNLOAD_DATA:
+        print('[ Downloading Data ]')
+        data = dataclient.getdata_fromct(
+                contract=CONTRACT,
+                timeframe=DATA_TIMEFRAME,
+                duration=DATA_DURATION)
+
+        datautils.save_data(data, output_filename=DATANAME)
+
+    dataclient.close()
     
     cerebro = bt.Cerebro()
     
     data = btfeeds.GenericCSVData(
-            dataname = args.data,
+            dataname = DATANAME,
             nullvalue = 0., 
             dtformat = ('%Y-%m-%d %H:%M:%S'),
             date = 0,
@@ -74,15 +155,15 @@ def run_strategy(args=None, **kwargs):
     cerebro.resampledata(data, timeframe=bt.TimeFrame.Minutes, compression=5)
 
     strategy_args = {
-            'ma_period':10,
-            'stddev_period':10,
-            'std_threshold':0.0004,
-            'mp_valuearea':0.7,
-            'mp_ticksize':0.0002,
-            'stoploss':0.005,
-            'takeprofit':0.005,
-            'positiontimedecay':60*5,
-            'minimumchangeprice':0.0003, 
+            'ma_period':args.ma_period,
+            'stddev_period':args.std_period,
+            'std_threshold':args.std_threshold,
+            'mp_valuearea':args.value_area,
+            'mp_ticksize':ticksize,
+            'stoploss':args.stoploss,
+            'takeprofit':args.takeprofit,
+            'positiontimedecay':args.time_decay,
+            'minimumchangeprice':args.minimum_price, 
             }
 
     cerebro.addstrategy(FadeSystemIB, **strategy_args)
