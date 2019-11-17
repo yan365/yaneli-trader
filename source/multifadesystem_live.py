@@ -9,15 +9,16 @@ import datetime as dt
 from strategies.multifadesystem import FadeSystemIB
 
 FOREX = [
-        'EUR.USD-CASH-IDEALPRO', 
+        'EUR.USD-CASH-IDEALPRO',
         'AUD.USD-CASH-IDEALPRO',
+        'USD.JPY-CASH-IDEALPRO',
+        'GBP.USD-CASH-IDEALPRO',
+        'CAD.USD-CASH-IDEALPRO',
         ]
 
-STOCKS = [
-        'AAPL-STK-SMART-USD',
-        'TWTR-STK-SMART', 
-        ]
+STOCKS = []
 
+FUTURES = []
 
 HOST = '127.0.0.1'
 PORT = 7497
@@ -25,16 +26,16 @@ CLIENTID = 1234
 
 STRATEGY_PARAMS = {
         "lotconfig": 1,
-        "std_threshold": 0.0005,
-        "stoploss": 0.0002,
-        "takeprofit": 0.0006,
+        "std_threshold": 1,
+        "stoploss": 0,
+        "takeprofit": 1,
+        "minimumchangeprice":0,
+        "mp_ticksize":0,
         # Indicators
         "ma_period": 8,
         "stddev_period":6,
         "atr_period":14,
-        # Market Profile
-        "mp_valuearea": 0.6,
-        "mp_ticksize":0.0002,
+        "mp_valuearea": 0.25,
         # Time
         "starttime":dt.time(0, 0, 0),
         "orderfinaltime":dt.time(15,0,0),
@@ -42,8 +43,6 @@ STRATEGY_PARAMS = {
         "timebetweenorders":dt.time(0,1,0),
         # Position Time
         "positiontimedecay":60*60*2,
-        # Position Filter
-        "minimumchangeprice":0.0007
         }
 
 
@@ -86,17 +85,31 @@ def run_live(args=None, **kwargs):
                 "dataname": dataname,
                 "timeframe": bt.TimeFrame.Minutes,
                 "compression": 1,
-                "historical":False,
-                "fromdate":dt.datetime(2019,10,1),
-                "todate":dt.datetime(2019,10,7)
+                #"historical":False,
+                #"fromdate":dt.datetime(2019,10,1),
+                #"todate":dt.datetime(2019,10,7)
                 }
         data = ibstore.getdata(**data_args)
         print("[ Add Data ] %s" % dataname)
         cerebro.adddata(data)
 
+    for dataname in FUTURES:
+
+        data_args = {
+                "dataname": dataname,
+                "timeframe": bt.TimeFrame.Minutes,
+                "compression": 1,
+                #"historical":False,
+                #"fromdate":dt.datetime(2019,10,1),
+                #"todate":dt.datetime(2019,10,7)
+                }
+        data = ibstore.getdata(**data_args)
+        print("[ Add Data ] %s" % dataname)
+        cerebro.adddata(data)
 
     cerebro.addstrategy(FadeSystemIB, **STRATEGY_PARAMS)
 
+    print("[ Running Cerebro ]")
     cerebro.run()
 
     cerebro.plot()

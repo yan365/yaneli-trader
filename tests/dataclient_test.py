@@ -29,7 +29,7 @@ dataclient.run(**args)
 
 
 client = dataclient.IBDataClient(HOST, PORT, CLIENT_ID)
-oldbar = client.earliestbar(
+oldbar = client.getearliestbar(
         symbol= 'EURUSD', 
         symboltype='Forex',
         exchange='IDEALPRO',
@@ -100,7 +100,7 @@ args = {
         'todate':dt.datetime(2019,9,24)
         }
 
-data4 = client.getdata_dt(**args)
+data4 = client.getdata_fromdt(**args)
 print('\nOption test:')
 print(data4.head())
 print(data4.tail())

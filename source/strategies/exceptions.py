@@ -10,3 +10,6 @@ class TradeModeNotFound(bterr.BacktraderError):
 
 class OrderNotExecuted(bterr.BacktraderError):
     pass
+
+class StopsCalculationError(bterr.BacktraderError):
+    pass

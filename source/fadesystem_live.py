@@ -4,6 +4,7 @@
 import backtrader as bt
 import backtrader.feeds as btfeeds
 import backtrader.analyzers as analyzer
+import datetime as dt
 import argparse
 from strategies.fadesystem import FadeSystemIB
 
@@ -75,13 +76,13 @@ def run_strategy(args=None, **kwargs):
 
     data_args = {
         "dataname":args.symbol,
-        "fromdate":INIT_DATE,
-        "todate":END_DATE,
+        #"fromdate":INIT_DATE,
+        #"todate":END_DATE,
         #"sessionstart":,
         #"sessionend":,
-        "timeframe":bt.TimeFrame.Seconds,
+        "timeframe":bt.TimeFrame.Minutes,
         "compression":1,
-        "historical":True
+        "historical":False
     }
 
     data_args.update(**kwargs)

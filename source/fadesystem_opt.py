@@ -7,20 +7,34 @@ import pandas as pd
 import argparse
 from tabulate import tabulate
 from strategies.fadesystem import FadeSystemIB
+from ib_insync import *
+from dataclient import *
+import datautils
 
 # Input File
-DEFAULT_FILE = 'dataname.csv'
+DEFAULT_FILE = 'EURUSD'
+CONTRACT = Forex('EURUSD', 'IDEALPRO', 'EUR')
+
+# TWS Parameters
+HOST='127.0.0.1'
+PORT = 7497
+CLIENTID = 1234
+
+# Data Parameters
+DOWNLOAD_DATA = True
+DATA_DURATION = '5 D'
+DATA_TIMEFRAME = '1 min'
 
 # Results Output File
-OUTPUT_FILENAME = 'out.csv'
+OUTPUT_FILENAME = 'results.csv'
 FILE_DELIMITER = ','
 
+# Optimization Parameters
 OPTIMIZE_MA_PERIOD = True
 OPTIMIZE_STDDEV_PERIOD = True
 OPTIMIZE_STD_THRESHOLD = True
 OPTIMIZE_ATR_PERIOD = True
 OPTIMIZE_MP_VALUEAREA = True
-OPTIMIZE_MP_TICKSIZE = True
 OPTIMIZE_STOPLOSS = True
 OPTIMIZE_TAKEPROFIT = True
 OPTIMIZE_POSITIONTIMEDECAY = True
@@ -31,7 +45,6 @@ STDDEV_PERIOD = [6, 8, 10, 12]
 STD_THRESHOLD = [0.0008, 0.001]
 ATR_PERIOD = [10, 14, 18]
 MP_VALUEAREA_RANGE = [0.5, 0.7]
-MP_TICKSIZE_RANGE = [0.2, 0.3]
 STOPLOSS_RANGE = [0.2]
 TAKEPROFIT_RANGE = [0.2]
 POSITIONTIMEDECAY = [ 60*60, 60*60*2]
@@ -89,9 +102,6 @@ def optimization_params():
     if OPTIMIZE_MP_VALUEAREA:
         args.update({ 'mp_valuearea': MP_VALUEAREA_RANGE })
 
-    if OPTIMIZE_MP_TICKSIZE:
-        args.update({ 'mp_ticksize': MP_TICKSIZE_RANGE })
-
     if OPTIMIZE_STOPLOSS:
         args.update({ 'stoploss': STOPLOSS_RANGE })
 
@@ -111,6 +121,18 @@ def run_optimization(args=None, **kwargs):
     args = parse_args(args)
 
     params = optimization_params()
+    client = IBDataClient(HOST, PORT, CLIENTID)
+    ticksize = client.getticksize(CONTRACT)
+    params.update({'mp_ticksize':ticksize})
+
+    if DOWNLOAD_DATA:
+        print('[ Downloading Data ]')
+        data = client.getdata_fromct(
+                CONTRACT,
+                DATA_TIMEFRAME,
+                DATA_DURATION)
+        datautils.save_data(data, output_filename=args.data)
+    client.close()
 
     cerebro = bt.Cerebro()
     cerebro.broker.set_cash(10000.)
@@ -126,7 +148,7 @@ def run_optimization(args=None, **kwargs):
             low = 3,
             close = 4,
             volume = 5,
-            timeframe = bt.TimeFrame.Ticks)
+            timeframe = bt.TimeFrame.Minutes)
 
     cerebro.adddata(data)
     cerebro.resampledata(

@@ -6,37 +6,55 @@ import backtrader.feeds as btfeeds
 import backtrader.analyzers as analyzer
 import argparse
 from strategies.multifadesystem import FadeSystemIB
+from dataclient import *
+import datautils
+from strategies.optparams import * 
+
+
+HOST='127.0.0.1'
+PORT = 7497
+CLIENTID = 1234
+
+DOWNLOAD_DATA = True # Download the data before optimization
+DATA_DURATION = '10 D'
+DATA_TIMEFRAME = '1 min'
+
 
 INITIAL_CASH = 10000.
 COMMISSION = 0.002
 
 # Data Parameter
-DATAFILES = ['eurusd.csv', 'audusd.csv']#, 'gbpusd.csv']
+DATAFILES = {
+        'EURUSD':Forex('EURUSD', 'IDEALPRO','EUR'),
+        'AUDUSD':Forex('AUDUSD', 'IDEALPRO','AUD'),
+        'USDJPY':Forex('USDJPY', 'IDEALPRO','USD'),
+        'GBPUSD':Forex('GBDUSD', 'IDEALPRO','GBP'),
+        }
 
 # Strategy Parameters
 OPTIMIZE_MA_PERIOD = True
-OPTIMIZE_STDDEV_PERIOD = False
+OPTIMIZE_STDDEV_PERIOD = True
 OPTIMIZE_STD_THRESHOLD = True
 OPTIMIZE_ATR_PERIOD = False
-OPTIMIZE_MP_VALUEAREA = False
-OPTIMIZE_MP_TICKSIZE = False
+OPTIMIZE_MP_VALUEAREA = True
 OPTIMIZE_STOPLOSS = True
 OPTIMIZE_TAKEPROFIT = True
-OPTIMIZE_POSITIONTIMEDECAY = False
-OPTIMIZE_MINIMUMPRICECHANGE = False
+OPTIMIZE_POSITIONTIMEDECAY = True
+OPTIMIZE_MINIMUMPRICECHANGE = True
 
-MA_PERIOD = [4]#[4, 8, 12, 16]
-STDDEV_PERIOD = [4]
-STD_THRESHOLD = [ 0.00007, 0.00005 ]
-ATR_PERIOD = [ 5,]
-MP_VALUEAREA_RANGE = [0.5]
-MP_TICKSIZE_RANGE = [0.2]
-STOPLOSS_RANGE = [0.02, 0.03]
-TAKEPROFIT_RANGE = [0.02, 0.03]
-POSITIONTIMEDECAY = [1000, 10000]
-MINIMUMPRICECHANGE = [ 0.0002]
 
-def optimization_params():
+MINIMUMPRICECHANGE = [ 0 ]
+STD_THRESHOLD = [ 0, 1, 2 ]
+STOPLOSS_RANGE = [0]
+TAKEPROFIT_RANGE = [ 0, 1, 2 ]
+MA_PERIOD = [6, 8]
+STDDEV_PERIOD = [6, 8]
+ATR_PERIOD = [5]
+MP_VALUEAREA_RANGE = [0.25, 0.3, 0.4]
+POSITIONTIMEDECAY = [60*60*2, 60*60*3]
+
+
+def optimization_params(ticksize=dict()):
     args = dict()
 
     if OPTIMIZE_MA_PERIOD:
@@ -54,9 +72,6 @@ def optimization_params():
     if OPTIMIZE_MP_VALUEAREA:
         args.update({ 'mp_valuearea': MP_VALUEAREA_RANGE })
 
-    if OPTIMIZE_MP_TICKSIZE:
-        args.update({ 'mp_ticksize': MP_TICKSIZE_RANGE })
-
     if OPTIMIZE_STOPLOSS:
         args.update({ 'stoploss': STOPLOSS_RANGE })
 
@@ -69,21 +84,41 @@ def optimization_params():
     if OPTIMIZE_MINIMUMPRICECHANGE:
         args.update({ 'minimumchangeprice': MINIMUMPRICECHANGE})
 
+    args.update(ticksize)
+
     return args
 
 
 def run_optimization(args=None, **kwargs):
 
+    print('[ Get Tick Size]')
+
+    dc = IBDataClient(HOST, PORT, CLIENTID)
+    for symbol, contract in DATAFILES.items():
+        TICKSIZE_CONFIGURATION.update({symbol:dc.getticksize(contract)})
+
+    datas = dict()
+    if DOWNLOAD_DATA:
+        for symbol, contract in DATAFILES.items():
+            print('[ Downloading Data %s ]' % symbol)
+            data = dc.getdata_fromct(
+                    contract,
+                    DATA_TIMEFRAME,
+                    DATA_DURATION)
+            datautils.save_data(data, output_filename=symbol)
+            datas.update({symbol:data})
+    dc.close()
+
     print('[ Configuring Cerebro ]')
-    params = optimization_params()
+    params = optimization_params(TICKSIZE_CONFIGURATION)
     
     cerebro = bt.Cerebro(maxcpus=1)
     cerebro.broker.set_cash(INITIAL_CASH)
     cerebro.broker.setcommission(COMMISSION)
     
-    for datafile in DATAFILES:
-        data = btfeeds.GenericCSVData(
-                dataname = datafile,
+    for symbol, datas in DATAFILES.items():
+        _data = btfeeds.GenericCSVData(
+                dataname = symbol,
                 nullvalue = 0., 
                 dtformat = ('%Y-%m-%d %H:%M:%S'),
                 date = 0,
@@ -92,11 +127,10 @@ def run_optimization(args=None, **kwargs):
                 low = 3,
                 close = 4,
                 volume = 5,
-                timeframe = bt.TimeFrame.Ticks,
+                timeframe = bt.TimeFrame.Minutes,
                 )
-
     
-        cerebro.adddata(data)
+        cerebro.adddata(_data)
 
     strategies = cerebro.optstrategy(
             FadeSystemIB,

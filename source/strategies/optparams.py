@@ -1,0 +1,86 @@
+# -*- coding: utf-8 -*-
+
+'''This file handles the optimization parameters for Multi Fade System Strategy
+'''
+
+LOTS_CONFIGURATION = [
+        [1,2,3,4,5,6]
+        ]
+
+# Change this with dataclient
+TICKSIZE_CONFIGURATION = {}
+
+STD_THRESHOLD_CONFIGURATION = [
+
+        {'EURUSD':0.001368,
+        'AUDUSD':0.000722,
+        'USDJPY':0.0997,
+        'GBPUSD':0.00323},
+
+        {'EUR.USD-CASH-IDEALPRO':0.001368,
+        'AUD.USD-CASH-IDEALPRO':0.000722,
+        'USD.JPY-CASH-IDEALPRO':0.0997,
+        'GBP.USD-CASH-IDEALPRO':0.00323,},
+
+        {'EUR.USD-CASH-IDEALPRO':0.00144,
+        'AUD.USD-CASH-IDEALPRO':0.00076,
+        'USD.JPY-CASH-IDEALPRO':0.105,
+        'GBP.USD-CASH-IDEALPRO':0.0034,},
+
+        {'EUR.USD-CASH-IDEALPRO':0.001512,
+        'AUD.USD-CASH-IDEALPRO':0.000798,
+        'USD.JPY-CASH-IDEALPRO':0.11025,
+        'GBP.USD-CASH-IDEALPRO':0.00357,},
+
+        ]
+
+TAKE_PROFIT_CONFIGURATION = [
+        {'EUR.USD-CASH-IDEALPRO':3000.,
+        'AUD.USD-CASH-IDEALPRO':3000.,
+        'USD.JPY-CASH-IDEALPRO':3000.,
+        'GBP.USD-CASH-IDEALPRO':3000.,},
+
+        {'EUR.USD-CASH-IDEALPRO':3000.,
+        'AUD.USD-CASH-IDEALPRO':3000.,
+        'USD.JPY-CASH-IDEALPRO':3000.,
+        'GBP.USD-CASH-IDEALPRO':3000.,},
+
+        {'EUR.USD-CASH-IDEALPRO':3000.,
+        'AUD.USD-CASH-IDEALPRO':3000.,
+        'USD.JPY-CASH-IDEALPRO':3000.,
+        'GBP.USD-CASH-IDEALPRO':3000.,},
+
+        {'EUR.USD-CASH-IDEALPRO':5000.,
+        'AUD.USD-CASH-IDEALPRO':5000.,
+        'USD.JPY-CASH-IDEALPRO':5000.,
+        'GBP.USD-CASH-IDEALPRO':5000.,},
+
+        {'EUR.USD-CASH-IDEALPRO':8000.,
+        'AUD.USD-CASH-IDEALPRO':8000.,
+        'USD.JPY-CASH-IDEALPRO':8000.,
+        'GBP.USD-CASH-IDEALPRO':8000.,},
+
+        ]
+
+STOP_LOSS_CONFIGURATION = [
+
+        {'EUR.USD-CASH-IDEALPRO':1000.,
+        'AUD.USD-CASH-IDEALPRO':1000.,
+        'USD.JPY-CASH-IDEALPRO':1000.,
+        'GBP.USD-CASH-IDEALPRO':1000.,},
+
+        ]
+
+MINIMUM_PRICE_CONFIGURATION = [
+
+        {'EURUSD':0.00015,
+        'AUDUSD':0.00008,
+        'USDJPY':0.01,
+        'GBPUSD':0.0003,},
+
+        {'EUR.USD-CASH-IDEALPRO':0.00015,
+        'AUD.USD-CASH-IDEALPRO':0.00008,
+        'USD.JPY-CASH-IDEALPRO':0.01,
+        'GBP.USD-CASH-IDEALPRO':0.0003,},
+
+        ]
