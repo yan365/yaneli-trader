@@ -322,7 +322,7 @@ class OrdersManagement(object):
             raise DirectionNotFound()
     
     def market_order(self, order):
-        '''Execute market order with already given parameters
+        '''Execute market order with order parameters
         '''
         if not self._check_state():
             return None
@@ -350,7 +350,7 @@ class OrdersManagement(object):
             raise DirectionNotFound()
 
     def print_status(self):
-        '''Print
+        '''Print status of order manager
         '''
         if self.dataclient != None:
             df = pd.DataFrame({
@@ -441,10 +441,10 @@ class OrdersManagement(object):
             pass
         #TODO
 
-    def set_executed(self, tradeid, price, datetime):
+    def set_executed(self, tradeid, datetime):
         for i in range(len(self.order_list)-1, -1, -1):
             if self.order_list[i]._id == tradeid:
-                self.order_list[i]._set_executed(price, datetime)
+                self.order_list[i]._set_executed(datetime)
                 break
     
     def set_takeprofit(self, _dict):
@@ -604,12 +604,19 @@ class OrderHandler(object):
        Parameters:
 
        - id
+       Id of order
 
        - lots
+       Lot size
 
        - side
+       Parameter side is NONE, LONG or SHORT. If NONE at initialization, this parameter must be changed before open a order
 
        - symbol
+       Symbol parameter receives the name of data in backtrader
+
+       -datetime
+       Optional argument representing the date and time of creation of the order object. The order can be created but not never sent to the broker
     '''
 
     def __init__(self, id, lots, side, symbol, datetime=None):
@@ -711,10 +718,14 @@ class OrderHandler(object):
             'closed':self.closed,
             }, index=[self.symbol])
     
-    def _set_executed(self, price, datetime):
+    def _set_executed(self, datetime, filled_price=None):
         '''Internal function for saving execution parameters.
         '''
-        self.executed = True
-        self._filled_time = datetime
-        self._filled_price = price
+        if self.executed:
+            #self.closed = True
+            pass
+        else:
+            self.executed = True
+            self._filled_time = datetime
+            self._filled_price = filled_price
 

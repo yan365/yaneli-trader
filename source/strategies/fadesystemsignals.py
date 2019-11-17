@@ -143,9 +143,10 @@ class TradeSignalsHandler(object):
     def check_last_signal_time(self):
         '''Minimum time for opening a new position
         '''
-        if self._last_signal_time is None:
+        if self._last_signal_time == None:
             return True
-        if self.now - self._last_signal_time <= dt.timedelta(seconds=self.signals_time_interval):
+
+        if pd.Timedelta(self.now - self._last_signal_time).total_seconds() <= self.signals_time_interval:
             return False
         return True
 

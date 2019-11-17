@@ -147,7 +147,7 @@ def run_strategy(args=None, **kwargs):
             low = 3,
             close = 4,
             volume = 5,
-            timeframe = bt.TimeFrame.Ticks,
+            timeframe = bt.TimeFrame.Minutes,
             )
     
     cerebro.adddata(data)

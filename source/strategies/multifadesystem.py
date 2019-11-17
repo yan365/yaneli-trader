@@ -229,10 +229,14 @@ class FadeSystemIB(bt.Strategy):
             if str(signal) != str(NONE):
                 # Get lot size 
                 if str(signal) == LONG:
+                    if len(self.lot_config) <= self.order_management.long_daily_orders:
+                        return
                     lots = self.lot_config[
                         self.order_management.long_daily_orders]
 
                 elif str(signal) == SHORT:
+                    if len(self.lot_config) <= self.order_management.short_daily_orders:
+                        return
                     lots = self.lot_config[
                         self.order_management.short_daily_orders]
 
@@ -293,7 +297,8 @@ class FadeSystemIB(bt.Strategy):
         if order.status == order.Completed:
             self.log('Order [%d] Completed' % order.tradeid)
 
-            self.order_management.set_executed(order.tradeid, self.getdatabyname(order.data), self.datas[0].datetime.datetime(0))
+            self.order_management.set_executed(order.tradeid, 
+                    self.datas[0].datetime.datetime(0))
             self.order_management.update_orders()
 
             df = pd.DataFrame({

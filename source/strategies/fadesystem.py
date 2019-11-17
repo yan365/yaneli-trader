@@ -230,7 +230,7 @@ class FadeSystemIB(bt.Strategy):
                 lots = lots,
                 side = signal, 
                 symbol = dataname,
-                dateteime = self.datas[0].datetime.datetime(0))
+                datetime = self.datas[0].datetime.datetime(0))
 
         self.signals_handler.last_orderid = self._tradeid
         self._tradeid += 1
