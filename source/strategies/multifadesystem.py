@@ -134,6 +134,8 @@ class FadeSystemIB(bt.Strategy):
         self._lastday = None
         self._newday = False
 
+        self.orders_allowed = dict()
+
     def start(self):
         if LOG:
 
@@ -165,7 +167,8 @@ class FadeSystemIB(bt.Strategy):
         _datetime = self.datas[0].datetime.datetime(0)
 
         self.cron_report(now)
-        self.order_management.next(_datetime)
+        self.orders_allowed = self.order_management.next(_datetime)
+
         for key, value in self.signals.items():
             self.signals[key].next(
                     datetime=_datetime,
@@ -211,15 +214,14 @@ class FadeSystemIB(bt.Strategy):
 
             self._lastday = today
 
-        if self.order_management.check_time_close_orders():
+        if not self.order_management.check_time_close_orders():
             self.order_management.close_all_positions()
             return
 
         # Check Stops and Time Decay
         self.order_management.check_close_conditions()
 
-        if not self.order_management.check_order_final_time():
-            # Not time for creating orders
+        if 'False' in self.orders_allowed.values():
             return
 
         for _data in self.getdatanames():
@@ -243,7 +245,6 @@ class FadeSystemIB(bt.Strategy):
                 self.log('[ %s Signal ] %s Lots: %s' % (signal, _data, lots))
                 # Open the order
                 self.open_order(_data, signal, lots)
-                #self._last_order_time = st.datas[0].datetime.datetime(0)
     
     def open_order(self, dataname, signal, lots):
         '''Open order based on signal parameter and lots
@@ -254,22 +255,23 @@ class FadeSystemIB(bt.Strategy):
                 lots = lots,
                 side = signal,
                 symbol = dataname,
-                datetime = self.datas[0].datetime.datetime(0)
+                datetime = self.datas[0].datetime.datetime(0),
                 )
 
+        order.close_price = self.getdatabyname(dataname).close[0],
         self.signals[dataname].last_orderid = self._tradeid
         self._tradeid += 1
 
         # Order parameters
         order.set_timedecay(self.params.positiontimedecay)
-        #TODO remove
+        #TODO change to symbol pnl stops 
         sl, tp = calc_stops(self.getdatabyname(dataname).close[0], 
                 order.side, 0.01, 0.01, mode=PERCENT)
         order.set_stops(sl, tp)
         order.print_order()
 
         # Send the order to the Order Management object
-        self.order_management.market_order(order)
+        self.order_management.market_order(self, order)
 
     def log(self, txt, dt=None):
         '''Print log messages and date
@@ -295,6 +297,8 @@ class FadeSystemIB(bt.Strategy):
             self.log('Order [%d] Submitted' % order.tradeid)
 
         if order.status == order.Completed:
+            if order.tradeid == 0:
+                return
             self.log('Order [%d] Completed' % order.tradeid)
 
             self.order_management.set_executed(order.tradeid, 
@@ -307,6 +311,7 @@ class FadeSystemIB(bt.Strategy):
                     'Order time': self.datas[0].datetime.datetime(0),
                     'Size':order.size,
                     'Data Name':order.data._name,
+                    'Close price':self.getdatabyname(order.data._name).close[0],
                     }, index=[0])
 
             self.log('[ Executed Order ] \n'+
@@ -370,6 +375,11 @@ class FadeSystemIB(bt.Strategy):
                 }, index=[0])
 
             self.log('\n'+tabulate(dataframe, headers='keys', tablefmt='psql', showindex=False))
+
+            order_status = self.order_management.get_order_status()
+
+            self.log('\n'+tabulate(order_status, headers='keys', showindex=False))
+
 
     def stop(self):
         self.log('[ Strategy Stop ]')

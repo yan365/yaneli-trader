@@ -131,6 +131,19 @@ class IBDataClient:
         '''
         self.client.disconnect()
 
+    def getaccountvalues(self):
+        av = self.client.accountValues()
+        df = pd.DataFrame()
+        for account_value in av:
+            if account_value.value != '0.00' and \
+                    account_value.currency != '':
+                df = df.append(pd.DataFrame({
+                    'Tag':account_value.tag,
+                    'Value':account_value.value,
+                    'Currency':account_value.currency}, 
+                    index=[0]))
+        return df
+
     def getaccountsummary(self, account=''):
         '''
         '''
@@ -305,33 +318,55 @@ class IBDataClient:
         details = self.client.reqContractDetails(contract)
         return self.client.reqMarketRule(details[0].marketRuleIds)
 
-    def getpositions(self, symbol_filter=None):
+    def getpositions(self, symbol=None):
         '''Return tuple with dataframes of positions and contracts.
         If filter input parameter is not None, than it's used for 
         filtering by symbol.
         '''
         positions = self.client.positions()
 
-        _positions = []
-        _contracts = []
+        df = pd.DataFrame()
         for position in positions:
-            _positions.append(position)
-            _contracts.append(position[1])
-        if symbol_filter == None:
-            return util.df(_positions), util.df(_contracts)
+            df = df.append(pd.DataFrame({
+                'Symbol':position[1].symbol,
+                'Currency':position[1].currency,
+                'conId':str(position[1].conId),
+                'localSymbol':str(position[1].localSymbol),
+                'Lots':position[2],
+                'Average Cost':position[3]}, index=[0]))
+
+        if symbol == None:
+            return df
+
         else:
-            return util.df(_positions).filter(items=[symbol_filter]), util.df(_contracts).filter(items=[symbol_filter])
+            return df[ df['Symbol'] == str(symbol) ]
 
     def getfuturespnl(self, account=''):
         '''Return the Futures PnL of the current state of account, and not from the current session.
         '''
-        return self.getaccountsummary(account).filter(items=['futuresPnL'])
+        df = pd.DataFrame()
+        summaries = self.client.accountValues()
+        for summary in summaries:
+            if summary.tag == 'FuturesPNL':
+                df = df.append(pd.DataFrame({
+                    'Tag': summary.tag,
+                    'Value': summary.value,
+                    'Currency': summary.currency}, 
+                    index=[0]))
+        return df
 
-    def getpnl(self, account=''):
-        pnl = self.client.reqPnL(account)
-        #TODO
-        return pnl
-
+    def getpnl(self, currency):
+        av = self.client.accountValues()
+        df = pd.DataFrame()
+        for account_value in av:
+            if account_value.currency == str(currency) and \
+                    account_value.tag == 'UnrealizedPnL':
+                df = df.append(pd.DataFrame({
+                    'Tag':account_value.tag,
+                    'Value':account_value.value,
+                    'Currency':account_value.currency}, 
+                    index=[0]))
+        return df
 
     def getpnlsingle(self, account='', conId='', modelcode=''):
         pnlsingle = self.client.reqPnLSingle(account, modelcode, conId)
@@ -341,7 +376,7 @@ class IBDataClient:
 
     def gettickers(self, contract):
         self.client.reqMktData(contract)
-        #TODO
+        #TODO implement async
         print(self.client.tickers())
 
     def getticksize(self, contract):
