@@ -118,6 +118,12 @@ class OrdersManagement(object):
 
         # Internal variable that stores last order time
         self._lastordertime = dt.datetime(2000,1,1)
+        
+        self._time_to_close = False # If time to close order already hapenned
+        self._order_final_time = False # If final time to open already hapenned
+        self._order_start_time = False
+
+        self.allow_orders = False
 
     def next(self, datetime):
         if self.dataclient != None:
@@ -125,29 +131,38 @@ class OrdersManagement(object):
         else:
             self.now = datetime
 
+        return self._check_state()
+
     def check_last_trade_time(self):
-        '''Check if time parameter allow open a new order based on last order executed time
+        '''Check if time parameter allow open a new order based on last time the algorithm called for open a new position
         '''
         if self.timebetweenorders == None:
             return True
+
         if self.now - self._lastordertime <= dt.timedelta(seconds=self.timebetweenorders):
             return False
+
         return True
     
     def confirm_fill(self, order):
         '''Get confirmation about the execution of order with the dataclient
         '''
         if self.dataclient != None:
-            contract, execution, report = self.dataclient.getfills()
-            #TODO
+            positions = self.dataclient.positions(order.symbol)
+            if positions.size <= 0:
+                return False
+            #TODO order list compared with broker orders (no id to compare)
+        else:
+            return order.executed
+
         return True
 
     def confirm_close(self):
         '''Check with dataclient if the order was executed
         '''
         if self.dataclient != None:
-            contract, execution, report = self.dataclient.getfills()
-            #TODO
+            contract, execution, report = self.dataclient.getexecutions()
+            #TODO Iterate broker orders and check with order list
         return True
 
     def clear_closed_orders(self):
@@ -155,21 +170,33 @@ class OrdersManagement(object):
         '''
         if self.dataclient != None:
             contracts, executions, reports = self.dataclient.getcompletedorders(apionly=True)
-            #TODO 
+            #TODO compare with backtrader strategy list of open orders 
 
         # Remove from current order list and append to order history list
         for i in range(len(self.order_list)-1, -1, -1):
-            if self.order_list[i].closed:
+            if self.order_list[i]._to_close:
+                self.order_list[i].closed = True
+                self.order_list[i].closed_time = self.now
                 self.order_history.append(self.order_list[i])
                 self.order_list.pop(i)
 
     def close_all_positions(self):
         for i in range(0, len(self.order_list)-1,  1):
-            self.close_order(self.order_list[i])
+            if self.close_order(self.order_list[i]):
+                self.order_list[i]._to_close = True
+                self.order_list[i]._to_close_time = self.now
         self.clear_closed_orders()
 
     def get_pnl(self, symbol):
-        pass #TODO
+        if self.dataclient != None:
+            values = self.dataclient.getaccountvalues()
+            return values[ values['Tag'] == str(symbol)]
+        else:
+            for order in self.order_list:
+                if order.symbol == str(symbol):
+                    #TODO implement order management internal pnl calculation
+                    pass
+            return 0.
 
     def check_close_conditions(self):
         '''Check the order close conditions, the symbol close conditions and the time parameter for closing the positions
@@ -185,6 +212,7 @@ class OrdersManagement(object):
         for key, value in self.stoploss.items():
             if self.get_pnL(key) <= float(value):
                 self.close_positions(key)
+
         self.clear_closed_orders()
 
         to_close = []
@@ -194,8 +222,10 @@ class OrdersManagement(object):
                 to_close.append(order)
         to_close = list(dict.fromkeys(to_close))
 
-        for order in to_close:
-            self.close_order(order)
+        for i in range(0, len(to_close), 1):
+            if self.close_order(self.order_list[i]):
+                self.order_list[i]._to_close = True
+                self.order_list[i]._to_close_time = self.now
         self.clear_closed_orders()
 
     def check_order_final_time(self):
@@ -206,16 +236,45 @@ class OrdersManagement(object):
         if self.orderfinaltime == None:
             return True
 
-        if self.dataclient == None:
+        if self._order_final_time:
+            return True
 
-            if self.now.time() >= self.orderfinaltime:
+        if self.dataclient != None:
+            if dt.datetime.now().time() >= self.orderfinaltime:
+                self._order_final_time = True
                 return False
 
         else:
-            if dt.datetime.now().time() >= self.orderfinaltime:
+            if self.now.time() >= self.orderfinaltime and \
+                    not self._order_final_time:
+                self._order_final_time = True
                 return False
 
         return True
+    
+    def check_order_start_time(self):
+        ''' Compare current time with the time parameter to check if allowed open orders
+        '''
+        if self._order_start_time:
+            # Time to open order already started or don't exists
+            return True
+
+        if self.orderstarttime == None:
+            self._order_start_time = True
+            return True
+
+        if self.dataclient != None:
+            if dt.datetime.now().time() >= self.orderstarttime:
+                self._order_start_time = True
+                return True
+
+        else: 
+            if self.now.time() >= self.orderstarttime:
+                self._order_start_time = True
+                return True
+
+        return False
+
 
     def check_time_close_orders(self):
         '''Check if parameter with time to close orders is activated, then
@@ -223,44 +282,68 @@ class OrdersManagement(object):
         '''
         if self.timetocloseorders == None:
             return False
+
+        if self._time_to_close:
+            return False
+
         if self.dataclient == None:
             if self.now.time() >= self.timetocloseorders:
-                return True
+                self._time_to_close = True
+                return False
+
         else:
             if dt.datetime.now().time() >= self.timetocloseorders:
-                return True
-        return False
-
-    def confirm_close(self, tradeid):
-        #TODO
+                self._time_to_close = True
+                return False
         return True
     
-    def close_order(self, order):
+    def close_order(self, order): # close_position
         '''Close position means openning a oposite
         position with same parameters
         '''
         if order.executed:
-            if not order.closed:
-                _order = self.st.close(
-                    data = self.st.getdatabyname(order.symbol),
-                    price=None, 
-                    exectype= Order.Market, 
-                    )
+            if not order._to_close:
+                _order = self.st.close(data = self.st.getdatabyname(order.symbol))
+                if _order == None:
+                    return False
 
-            if self.dataclient != None:
-                self.confirm_close(symbol)
+                if not  _order.alive:
+                    return False
+
+                if self.dataclient != None:
+                    # TODO Additional check 
+                    pass
+        return True
 
     def get_time_close_orders(self): #TODO not used
-        '''Return the secconds missing to close orders time.
+        '''Return the secconds missing to close all orders time.
         '''
         if self.timetocloseorders != None:
             return pd.Timedelta(self.now.time() - self.timetocloseorders).total_secconds()
         return -1
+    
+    def get_orders_number(self):
+        '''Get the number of open orders 
+        '''
+        if self.dataclient != None:
+            return self.dataclient.getpositions().size
+        else:
+            return len(self.order_list)
+
+    def get_closed_orders(self):
+        if dataclient != None:
+            con, exe, rep = self.dataclient.fills()
+            return exe
+        else:
+            return self.order_history
+
+    def get_order_status(self):
+        return pd.DataFrame(data=self._check_state(), index=[0])
 
     def lit_order(self, order, limit_price, aux_price):
         '''Limit if Touched Order (IB only)
         '''
-        if not self._check_state():
+        if 'False' in self._check_state().values():
             return None
         self._add_order(order)
 
@@ -293,13 +376,13 @@ class OrdersManagement(object):
     def limit_order(self, order, price, valid = None):
         '''Execute Limit Order
         '''
-        if not self._check_state():
+        if 'False' in self._check_state().values():
             return None
         self._add_order(order)
 
         if order.side == LONG:
-            _order = st.buy(
-                    data= self.st.getdatabyname(order.symbol),
+            _order = self.st.buy(
+                    data= st.getdatabyname(order.symbol),
                     size = order.lot,
                     price = price,
                     exectype = Order.Limit,
@@ -309,8 +392,8 @@ class OrdersManagement(object):
             return _order
 
         elif order.side == SHORT:
-            _order = st.sell(
-                    data = self.st.getdatabyname(order.symbol),
+            _order = self.st.sell(
+                    data = st.getdatabyname(order.symbol),
                     size = order.lot,
                     price = price,
                     exectype = Order.Limit,
@@ -321,15 +404,16 @@ class OrdersManagement(object):
         else:
             raise DirectionNotFound()
     
-    def market_order(self, order):
+    def market_order(self, st, order):
         '''Execute market order with order parameters
         '''
-        if not self._check_state():
+        if 'False' in  self._check_state().values():
             return None
+
         self._add_order(order)
 
         if order.side == LONG:
-            _order = self.st.buy( 
+            _order = st.buy( 
                     size= order.lot,
                     price=None, 
                     exectype=Order.Market, 
@@ -338,7 +422,7 @@ class OrdersManagement(object):
             return _order
 
         elif order.side == SHORT:
-            _order = self.st.sell(
+            _order = st.sell(
                     size= order.lot,
                     price=None, 
                     exectype=Order.Market, 
@@ -370,7 +454,7 @@ class OrdersManagement(object):
     def protection_order(self, order, price, valid = None):
         '''Market with Protection Order (IB only)
         '''
-        if not self._check_state():
+        if 'False' in  self._check_state().values():
             return None
         self._add_order(order)
 
@@ -404,6 +488,10 @@ class OrdersManagement(object):
         self.daily_orders = []
         self.short_daily_orders = 0
         self.long_daily_orders = 0
+
+        self._time_to_close = False
+        self._order_final_time = False
+        self._order_start_time = False
     
     def set_orders_start_time(self, value):
         '''Time of day when orders are allowed
@@ -425,26 +513,10 @@ class OrdersManagement(object):
         '''
         self.timebetweenorders = value
 
-    def show_orders_number(self):
-        '''Show the open orders number and the closed orders number.
-        '''
-        if self.dataclient != None:
-            #TODO
-            return 0
-        else:
-            return len(self.order_list)
-
-    def show_closed_orders(self):
-        if dataclient != None:
-            con, exe, rep = self.dataclient.getcompletedorders()
-        else:
-            pass
-        #TODO
-
-    def set_executed(self, tradeid, datetime):
+    def set_executed(self, tradeid, datetime, filled_price=None, close_price=None):
         for i in range(len(self.order_list)-1, -1, -1):
             if self.order_list[i]._id == tradeid:
-                self.order_list[i]._set_executed(datetime)
+                self.order_list[i]._set_executed(datetime, filled_price, close_price)
                 break
     
     def set_takeprofit(self, _dict):
@@ -478,7 +550,7 @@ class OrdersManagement(object):
 
             for order in self.order_list:
                 open_orders = open_orders.append(order.as_dataframe())
-        output_fn = 'open_orders'+str(dt.datetime.utcnow()).replace('-','')+'.csv'
+        output_fn = 'open_orders_'+str(dt.datetime.utcnow()).replace('-','').replace(' ', '').replace('.', '')+'.csv'
 
         if open_orders.size > 0:
             du.save_data(dataframe= open_orders, 
@@ -497,7 +569,7 @@ class OrdersManagement(object):
     def stop_order(self, order, trigger_price, valid = None):
         '''Execute Stop Order
         '''
-        if not self._check_state():
+        if 'False' in  self._check_state().values():
             return None
         self._add_order(order)
 
@@ -528,12 +600,12 @@ class OrdersManagement(object):
     def stoplimit_order(self, order, trigger_price, limit_price, valid=None):
         '''Execute Limit Order at Trigger Price
         '''
-        if not self._check_state():
+        if 'False' in  self._check_state().values():
             return None
         self._add_order(order)
 
         if order.side == LONG:
-            _order = st.buy(
+            _order = self.st.buy(
                     data = st.getdatabyname(order.symbol),
                     size = order.lot,
                     price = trigger_price,
@@ -545,7 +617,7 @@ class OrdersManagement(object):
             return _order
 
         elif order.side == SHORT:
-            _order = st.sell(
+            _order = self.st.sell(
                     data = st.getdatabyname(order.symbol),
                     size = order.lot,
                     price = trigger_price,
@@ -566,6 +638,7 @@ class OrdersManagement(object):
     def _add_order(self, order):
         '''Internal function for adding orders to the orders lists
         '''
+        self._lastordertime = self.now
         if order != None:
             self.order_list.append(order)
             self.daily_orders.append(order)
@@ -578,25 +651,15 @@ class OrdersManagement(object):
         '''Check if time parameters allow open a new order.
         This function is called just before sending a new order.
         '''
-        if self.dataclient == None:
-            # If dataclient is deactivated then use backtrader time
-            self._lastordertime = self.st.datas[0].datetime.datetime(0)
-        else:
-            self._lastordertime = dt.datetime.now()
 
-        if self.orderstarttime != None:
+        result = dict({
+            'Last trade time':self.check_last_trade_time(),
+            'Time to close orders':self.check_time_close_orders(),
+            'Order start time':self.check_order_start_time(),
+            'Order end time':self.check_order_final_time()})
 
-            if self.now.time() < self.orderstarttime:
-                return False
+        return result
 
-        if self.orderfinaltime != None:
-            if self.now.time() > self.orderfinaltime:
-                return False
-
-        if not self.check_last_trade_time():
-            return False
-
-        return True
 
 class OrderHandler(object):
     '''Stores order parameters and order state information. Managed with Order Management object.
@@ -625,18 +688,26 @@ class OrderHandler(object):
         self.symbol = symbol
         self.lot = lots
         self.side = side # LONG or SHORT
-    
+        
         self.executed = False # If order was executed
-        self.closed = False   # If order was closed
+        self.closed = False   # If order was confirmed closed
+        self.closed_time = None
 
         # Time parameter
         self.time_decay = None
+    
+        self._close_price = None # Close price at execution
 
         # Internal vars
+        self._filled_time = None
+        self._filled_price = None
+
+        self._to_close = False  # The order to close position was sent to broker
+        self._to_close_time = None
+
         self._stoploss = None # Absolute value of stop loss
         self._takeprofit = None
-        self._filled_time = None
-        self._filled_price = None 
+
         if datetime == None:
             self._created_time = dt.datetime.now()
         else:
@@ -712,20 +783,28 @@ class OrderHandler(object):
             'executed price':str(self._filled_price),
             'executed_time':str(self._filled_time),
             'created_time':str(self._created_time),
+            'close price':str(self._close_price),
             'stoploss':str(self._stoploss),
             'takeprofit':str(self._takeprofit),
             'time_decay':str(self.time_decay),
-            'closed':self.closed,
+            'to_close':str(self._to_close),
+            'to_close_time':str(self._to_close_time),
+            'closed':str(self.closed),
+            'closed time':str(self.closed_time),
             }, index=[self.symbol])
     
-    def _set_executed(self, datetime, filled_price=None):
+    def _set_executed(self, datetime, filled_price=None, close_price=None):
         '''Internal function for saving execution parameters.
         '''
-        if self.executed:
-            #self.closed = True
-            pass
-        else:
+        if not self.executed:
             self.executed = True
             self._filled_time = datetime
             self._filled_price = filled_price
+            self._close_price = close_price # Close price at execution
+
+    def _set_closed(self, datetime):
+        if not self.closed:
+            self.closed = True
+            self.closed_time = datetime
+
 

@@ -124,6 +124,8 @@ class FadeSystemIB(bt.Strategy):
         # Date/Time vars
         self._lastday = None
         self._newday = False
+        
+        self.orders_allowed = dict()
 
     def start(self):
         df = pd.DataFrame({
@@ -153,7 +155,8 @@ class FadeSystemIB(bt.Strategy):
         _datetime = self.datas[0].datetime.datetime(0)
 
         self.cron_report(now)
-        self.order_management.next(_datetime)
+        self.orders_allowed = self.order_management.next(_datetime)
+
         _std = self.stddev[0]
         _open = self.datas[0].open[0]
         _high = self.datas[0].high[0]
@@ -194,15 +197,14 @@ class FadeSystemIB(bt.Strategy):
 
             self._lastday = today
 
-        if self.order_management.check_time_close_orders():
+        if not self.order_management.check_time_close_orders():
             self.order_management.close_all_positions()
             return
-
+        
         # Check Stops and Time Decay
         self.order_management.check_close_conditions()
 
-        if not self.order_management.check_order_final_time():
-            # Not time for creating orders
+        if 'False' in  self.orders_allowed.values():
             return
 
         # Check Trade Signals
@@ -243,7 +245,7 @@ class FadeSystemIB(bt.Strategy):
         order.print_order()
 
         # Send the Order to the Order Management object
-        self.order_management.market_order(order)
+        self.order_management.market_order(self, order)
 
     def log(self, txt, dt=None):
         '''Print log messages and date
@@ -268,9 +270,12 @@ class FadeSystemIB(bt.Strategy):
             self.log('Order [%d] Submitted' % order.tradeid)
 
         if order.status == order.Completed:
+            if order.tradeid == 0:
+                return
             self.log('Order [%d] Completed' % order.tradeid)
 
-            self.order_management.set_executed(order.tradeid, self.datas[0].close[0], self.datas[0].datetime.datetime(0))
+            #self.order_management.set_executed(order.tradeid, self.datas[0].close[0], self.datas[0].datetime.datetime(0))
+            self.order_management.set_executed(order.tradeid, self.datas[0].datetime.datetime(0))
             self.order_management.update_orders()
 
             df = pd.DataFrame({
@@ -279,6 +284,7 @@ class FadeSystemIB(bt.Strategy):
                 'Order time':self.datas[0].datetime.datetime(0),
                 'Size':order.size,
                 'Data Name':order.data._name,
+                'Close price':self.getdatabyname(order.data._name).close[0],
                 }, index=[0])
 
             self.log('[ Executed Order ] \n'+
@@ -346,6 +352,10 @@ class FadeSystemIB(bt.Strategy):
         self.log('[ CRON Report ] \n'+
                 tabulate(df, headers='keys', tablefmt='psql', showindex=False)+'\nData1: \n'+
                 tabulate(data, headers='keys', tablefmt='psql', showindex=False))
+
+        order_status = self.order_management.get_order_status()
+
+        self.log('\n'+tabulate(order_status, headers='keys', showindex= False))
 
     def stop(self):
         self.log('[ Strategy Stop]')
