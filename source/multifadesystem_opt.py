@@ -54,6 +54,22 @@ MP_VALUEAREA_RANGE = [0.25, 0.3, 0.4]
 POSITIONTIMEDECAY = [60*60*2, 60*60*3]
 
 
+class AcctStats(bt.Analyzer):
+    
+    def __init__(self):
+        self.start_val = self.strategy.broker.get_value()
+        self.end_val = None
+
+    def stop(self):
+        self.end_val = self.strategy.broker.get_value()
+
+    def get_analysis(self):
+        return { "start":self.start_val, 
+                "end": self.end_val,
+                "growth": self.end_val - self.start_val,
+                "return": self.end_val/self.start_val}
+
+
 def optimization_params(ticksize=dict()):
     args = dict()
 
@@ -137,23 +153,51 @@ def run_optimization(args=None, **kwargs):
             **params)
 
     cerebro.addanalyzer(analyzer.DrawDown, _name='drawdown')
-    cerebro.addanalyzer(analyzer.SharpeRatio, _name='sharpe', timeframe=bt.TimeFrame.Weeks)
-    cerebro.addanalyzer(analyzer.PyFolio, _name='pyfolio')
+    #cerebro.addanalyzer(analyzer.SharpeRatio, _name='sharpe', timeframe=bt.TimeFrame.Weeks)
+    #cerebro.addanalyzer(analyzer.PyFolio, _name='pyfolio')
+    cerebro.addanalyzer(AcctStats)
 
     print('[ Initializing ]')
     results = cerebro.run()
 
-    df_results = pd.DataFrame({
+    df_results = pd.DataFrame()
+    for result in results:
+        for it in result:
+            df_results = df_results.append({
+                'Lot Config':it.params.lotconfig,
+                'Stop Loss':it.params.stoploss,
+                'Take Profit':it.params.takeprofit,
+                'Std Threshold':it.params.std_threshold,
+                'Minimum Price Change':it.params.minimumchangeprice,
+                'MA Period':it.params.ma_period,
+                'Std Period':it.params.stddev_period,
+                'ATR Period':it.params.atr_period,
+                'MP Value Area':it.params.mp_valuearea,
+                'MP Tick Size':it.params.mp_ticksize,
+                'Order Start Time':it.params.starttime,
+                'Order Final Time':it.params.orderfinaltime,
+                'Time to Close Orders':it.params.timetocloseorders,
+                'Time Between Orders':it.params.timebetweenorders,
+                'Position Time Decay':it.params.positiontimedecay,
+                'Return':it.analyzers.acctstats.get_analysis()['return'],
+                'End':it.analyzers.acctstats.get_analysis()['end'],
+                'Growth':it.analyzers.acctstats.get_analysis()['growth'],
+                'Drawdown':it.analyzers.drawdown.get_analysis(),
+                }, ignore_index=True)
+
+    '''df_results = pd.DataFrame({
         r[0].params: 
         r[0].analyzers.acctstats.get_analysis() for r in results}
         ).T.loc[:, ['end', 'growth', 'return']]
 
+
     print(df_results.head())
+    '''
 
     sorted_values = df_results.sort_values('return', ascending= False)
     sorted_values.to_csv(OUTPUT_FILENAME, FILE_DELIMITER)
 
-    print(tabulate(sorted_values))
+    print(tabulate(sorted_values, headers='keys'))
 
 if __name__ == '__main__':
     run_optimization()

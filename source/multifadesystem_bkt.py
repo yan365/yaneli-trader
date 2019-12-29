@@ -15,8 +15,8 @@ PORT = 7497
 CLIENTID = 1234
 
 # Download the data used in backtest
-DOWNLOAD_DATA = True
-DATA_DURATION = '100 D'
+DOWNLOAD_DATA = False
+DATA_DURATION = '10 D'
 DATA_TIMEFRAME = '1 min'
 
 # Broker configuration
@@ -90,15 +90,22 @@ def run_backtest(args=None, **kwargs):
 
     print('[ Configuring Cerebro ]')
     strategy_args = {
-            'ma_period': MA_PERIOD,
-            'stddev_period': STDDEV_PERIOD,
-            'std_threshold': STD_THRESHOLD,
-            'atr_period': ATR_PERIOD,
-            'mp_valuearea': MP_VALUEAREA_RANGE, 
+            'lotconfig':0,
             'stoploss': STOPLOSS_RANGE,
             'takeprofit': TAKEPROFIT_RANGE,
+            'std_threshold': STD_THRESHOLD,
+            'minimumchangeprice': MINIMUMPRICECHANGE,
+            'ma_period': MA_PERIOD,
+            'stddev_period': STDDEV_PERIOD,
+            'atr_period': ATR_PERIOD,
+            'starttime':dt.time(9,0,0),
+            'orderfinaltime':dt.time(15, 0, 0),
+            'timetocloseorders':dt.time(16,0,0),
+            'timebetweenorders':60*5,
+            'positiontimedecay':60*60*2,
+            'mp_valuearea': MP_VALUEAREA_RANGE, 
             'positiontimedecay': POSITIONTIMEDECAY,
-            'minimumchangeprice': MINIMUMPRICECHANGE,}
+            }
 
     strategy_args.update(**kwargs)
     

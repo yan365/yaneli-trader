@@ -9,7 +9,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from tabulate import tabulate
-from market_profile import MarketProfile
 
 from orderutils import *
 from datautils import *
@@ -88,7 +87,9 @@ class FadeSystemIB(bt.Strategy):
             'timetocloseorders':dt.time(16,0,0),
             'timebetweenorders':60 * 5,
             'positiontimedecay':60 * 60 * 2, # Time in seconds to force a stop
-
+            # Data Client Parameters
+            'dataclient':None,
+            'account_number':'',
             }
 
     def __init__(self, **kwargs):
@@ -99,7 +100,9 @@ class FadeSystemIB(bt.Strategy):
         self.atr = btind.AverageTrueRange(self.datas[1], period=self.params.atr_period)
 
         # Order Management 
-        self.order_management = OrdersManagement(self, None, '')
+        dataclient = self.params.dataclient
+        account = self.params.account_number
+        self.order_management = OrdersManagement(self, dataclient, account)
 
         self.order_management.set_orders_start_time(self.params.starttime)
         self.order_management.set_orders_final_time(self.params.orderfinaltime)
@@ -124,6 +127,8 @@ class FadeSystemIB(bt.Strategy):
         # Date/Time vars
         self._lastday = None
         self._newday = False
+        
+        self.orders_allowed = dict()
 
     def start(self):
         df = pd.DataFrame({
@@ -144,6 +149,7 @@ class FadeSystemIB(bt.Strategy):
                 tabulate(df, headers='keys', tablefmt='psql', showindex=False))
 
     def next(self):
+
         if self._lastday == None:
             self._lastday = self.datas[0].datetime.date(0)
             self._last_cron_time = self.datas[0].datetime.time(0)
@@ -153,7 +159,8 @@ class FadeSystemIB(bt.Strategy):
         _datetime = self.datas[0].datetime.datetime(0)
 
         self.cron_report(now)
-        self.order_management.next(_datetime)
+        self.orders_allowed = self.order_management.next(_datetime)
+
         _std = self.stddev[0]
         _open = self.datas[0].open[0]
         _high = self.datas[0].high[0]
@@ -187,22 +194,21 @@ class FadeSystemIB(bt.Strategy):
                         to_date=lastday_end)
 
             # Plot data and orders
-            plot_orders(data, self.order_management.daily_orders, dataname=data)
+            plot_orders(data, self.order_management.daily_orders, dataname=str(today))
             self.signals_handler.generate_mp(data)
             self.signals_handler.set_signal_mode()
             self.signals_handler.print_status()
 
             self._lastday = today
 
-        if self.order_management.check_time_close_orders():
+        if not self.order_management.check_time_close_orders():
             self.order_management.close_all_positions()
             return
-
+        
         # Check Stops and Time Decay
         self.order_management.check_close_conditions()
 
-        if not self.order_management.check_order_final_time():
-            # Not time for creating orders
+        if 'False' in  self.orders_allowed.values():
             return
 
         # Check Trade Signals
@@ -243,7 +249,7 @@ class FadeSystemIB(bt.Strategy):
         order.print_order()
 
         # Send the Order to the Order Management object
-        self.order_management.market_order(order)
+        self.order_management.market_order(self, order)
 
     def log(self, txt, dt=None):
         '''Print log messages and date
@@ -268,10 +274,9 @@ class FadeSystemIB(bt.Strategy):
             self.log('Order [%d] Submitted' % order.tradeid)
 
         if order.status == order.Completed:
-            self.log('Order [%d] Completed' % order.tradeid)
+            if order.tradeid == 0:
+                return
 
-            self.order_management.set_executed(order.tradeid, self.datas[0].close[0], self.datas[0].datetime.datetime(0))
-            self.order_management.update_orders()
 
             df = pd.DataFrame({
                 'Trade Id':order.tradeid,
@@ -279,6 +284,7 @@ class FadeSystemIB(bt.Strategy):
                 'Order time':self.datas[0].datetime.datetime(0),
                 'Size':order.size,
                 'Data Name':order.data._name,
+                'Close price':self.getdatabyname(order.data._name).close[0],
                 }, index=[0])
 
             self.log('[ Executed Order ] \n'+
@@ -302,10 +308,14 @@ class FadeSystemIB(bt.Strategy):
     def notify_trade(self, trade):
         '''Notify any opening/updating/closing trade
         '''
+        self.log('[ Notify Trade ]  Ref: %s  Status: %s  Is closed: %s' % (
+            trade.ref, trade.status, trade.isclosed))
+        self.order_management.set_exec(trade.ref, trade.tradeid, trade.status, self.datas[0].datetime.datetime(0))
+
         if not trade.isclosed:
             return
         else:
-            self.log('[ Notify Trade ]\nGross: %.2f    Net: %.2f' % (trade.pnl, trade.pnlcomm))
+            self.log('[ Position Closed ]\nGross: %.2f    Net: %.2f' % (trade.pnl, trade.pnlcomm))
 
     def notify_cashvalue(self, cash, value):
         '''Notify any change in cash or value in broker
@@ -346,6 +356,10 @@ class FadeSystemIB(bt.Strategy):
         self.log('[ CRON Report ] \n'+
                 tabulate(df, headers='keys', tablefmt='psql', showindex=False)+'\nData1: \n'+
                 tabulate(data, headers='keys', tablefmt='psql', showindex=False))
+
+        order_status = self.order_management.get_order_status()
+
+        self.log('\n'+tabulate(order_status, headers='keys', showindex= False))
 
     def stop(self):
         self.log('[ Strategy Stop]')
