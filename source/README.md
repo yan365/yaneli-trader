@@ -1,19 +1,33 @@
 
 ## Backtrader Algorithms
 
- *  fadesystemalgo.py
+##### Backtrader Algorithms for Backtesting
 
-###### Fade System strategy for Live trading using TWS
+ *  fadesystem_bkt.py
 
+ *  multifadesystem_bkt.py
 
- *  fadesystemcsv.py
+##### Fade System strategy for Live trading using TWS
 
-###### Fade System strategy for backtests using csv data files
+ *  fadesystem_live.py
+ 
+ *  multifadesystem_live.py
 
+##### Fade System Algorithms for Optimization
 
-## Data Functions and Objects
+ *  fadesystem_opt.py
 
+ *  multifadesystem_opt.py
+
+## Data and Order Tools
+
+##### Data Utils
+
+ * dataclient.py
+ 
  *  datautils.py
 
-###### Functions for handling data
+##### Order Utils
+
+ * orderutils.py
 

@@ -13,8 +13,19 @@
 
 #### Exit is a single order for total position size. In the above example exit price will be 1503 for a total of 12 Gold contracts.
 
+### Fade System Algorithms
 
-# Utils
+ * fadesystemsignals.py - Signals handler for Fade System Strategies
 
- * OrderHandler
+ * fadesystem.py - Backtrader Stragegy for Fade System
+
+ * multifadesystem.py - Backtrader Strategy for Fade System using multiple symbols
+
+### Strategy Utilities
+
+ * optparams.py - Parameters configurations
+
+### Strategy Exceptions
+
+ * exceptions.py - Exceptions for strategies
 
