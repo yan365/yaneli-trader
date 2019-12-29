@@ -20,10 +20,7 @@ STOCKS = [
         Stock('TWTR', 'SMART', 'USD'),
         ]
 
-FOREX = [
-        #Forex('USDEUR','IDEALPRO', 'USD'),
-        #Forex('USDGBP','IDEALPRO', 'USD'),
-        ]
+FOREX = []
 
 client = dataclient.IBDataClient(HOST, PORT, CLIENT_ID)
 
