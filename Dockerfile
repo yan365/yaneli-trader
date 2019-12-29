@@ -1,17 +1,20 @@
-FROM fedora:29
+FROM debian:10
 
-RUN dnf update -y
+RUN apt-get update -y
 
-RUN dnf install -y glibc-devel gcc gcc-c++ make libtool curl
+RUN apt-get install -y python3-pip python3-pycurl
 
-RUN dnf install -y python3-pip python3-devel python3-pycurl
+RUN apt-get install -y git vim gcc adduser
 
-RUN dnf install -y git vim 
+RUN adduser --home /home/trader --system trader
 
-RUN adduser -m -d /home/trader trader
+COPY ./requirements.txt /home/trader/requirements.txt
 
 WORKDIR /home/trader
 
+COPY ./ /home/trader
+
+USER trader
+
 RUN pip3 install --user -r requirements.txt
 
-COPY ./ /home/trader/source
