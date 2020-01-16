@@ -8,11 +8,9 @@ RUN apt-get install -y git vim gcc adduser
 
 RUN adduser --home /home/trader --system trader
 
-COPY ./requirements.txt /home/trader/requirements.txt
+WORKDIR /home/trader/
 
-WORKDIR /home/trader
-
-COPY ./ /home/trader
+COPY ./ /home/trader/
 
 USER trader
 
