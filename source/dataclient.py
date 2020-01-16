@@ -127,6 +127,12 @@ class IBDataClient:
         self.client = IB()
         self.client.connect(host, port, clientid)
 
+    def cancelorder(self, order):
+        '''Cancel orders
+        '''
+        trade = self.client.cancelOrder(order)
+        return trade
+
     def connected(self):
         '''Check if api client is connected.
         '''
@@ -238,6 +244,7 @@ class IBDataClient:
                     'date':'datetime', 
                     'high':'High', 
                     'low':'Low'})
+
         return dataframe
 
     def getdata_fromdt(self, symbol, symboltype, exchange='IDEALPRO', 
@@ -401,6 +408,31 @@ class IBDataClient:
             'Contract Type':type_str,
             }, index=[0])
 
+    def limit_long(self, contract, price, size):
+        '''Open a long limit order
+        '''
+        order = LimitOrder('BUY', price, size)
+        trade = self.client.placeOrder(contract, order)
+        return order, trade
+
+    def limit_short(self, contract, price, size):
+        '''Open a short limit order
+        '''
+        order = LimitOrder('SELL', price, size)
+        trade = self.client.placeOrder(contract, order)
+        return order, trade
+
+    def limit_pricechange(self, contract, order, newprice):
+        '''Change price of limit order
+        '''
+        order.lmtPrice = newprice
+        trade = self.client.placeOrder(contract, order)
+        return order, trade
+
+    def sleep(self, time):
+        '''Sleep time in seconds
+        '''
+        self.client.sleep(time)
 
 '''Shortcut to download and save data
 '''

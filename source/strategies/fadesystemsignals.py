@@ -150,7 +150,7 @@ class TradeSignalsHandler(object):
             return False
         return True
 
-    def generate_mp(self, data):
+    def generate_mp(self, data, dataname=''):
         '''Generate Market Profile. The signal handler need this function 
         to be called every beginning of cycle. This function is not 
         called internally.
@@ -160,7 +160,8 @@ class TradeSignalsHandler(object):
                 data, 
                 ticksize=self.ticksize,
                 valuearea=self.valuearea,
-                save_fig=True)
+                save_fig=True,
+                name=dataname)
 
     def set_signal_mode(self):
         '''
