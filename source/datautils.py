@@ -54,7 +54,7 @@ def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7,
         filename = name+'_'+mp_mode+'_'+str(dataframe['datetime'].iloc[
                     dataframe['datetime'].size-1])+'_'+\
                     str(dataframe['datetime'].iloc[0])
-        filename.replace(' ','_').replace(':','').replace('.','')+'.png'
+        filename = filename.replace(' ','_').replace(':','_').replace('.','')+'.png'
         fig.figure.savefig(filename)
 
     return profile, mp_slice
@@ -110,17 +110,18 @@ def parsedata(data, from_date=None, to_date=None, size_limit=60*60*24):
     return dataframe
 
 def parsedataframe(dataframe, from_date=None, to_date=None):
-    '''Get data from backtrader cerebro and convert
-    in a pandas dataframe. The columns names are changed for
-    compatibility with Market Profile library. The dataframe 
-    can be filtered by date.
+    '''Adjust dataframe columns and filter by date. The columns names are changed for compatibility with Market Profile library.
     '''
     timestamp = []
     datetime = []
 
     dataframe['Close'] = dataframe['Close'].astype('float')
 
-    #TODO Need create timestamp column to work properly
+    lines, columns = dataframe.shape
+    for i in range(0, lines, 1):
+        timestamp.append(dt.datetime.timestamp(dataframe['datetime'].iloc[i]))
+
+    dataframe['timestamp'] = timestamp
 
     # To work properly with Market Profile library
     dataframe['datetime'] = pd.to_datetime(dataframe['datetime'],
@@ -179,6 +180,8 @@ def plot_orders(data, orders, dataname='orders'):
     plt.savefig(dataname.replace(' ','_').replace('.','')+'.png')
 
 def plot_data(dataframe, y_axis='close', **kwargs):
+    '''Bar plot of dataframe
+    '''
     args = {
             'y':y_axis,
             }
