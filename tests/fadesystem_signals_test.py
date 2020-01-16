@@ -3,6 +3,7 @@
 import sys
 sys.path.append('../source/')
 
+import time
 from strategies.fadesystemsignals import *
 from dataclient import *
 from datautils import *
@@ -38,13 +39,14 @@ FOREX_SYMBOLS = [
         ]
 
 STOCK_SYMBOLS = [
-        #Stock('AMD', 'SMART', 'USD'),
-        #Stock('TSLA', 'SMART', 'USD'),
-        #Stock('TWTR', 'SMART', 'USD'),
+        Stock('AMD', 'SMART', 'USD'),
+        Stock('TSLA', 'SMART', 'USD'),
+        Stock('TWTR', 'SMART', 'USD'),
         ]
 
 def create_trade_signals(dataclient):
     trade_signals = dict()
+
     for stock in STOCK_SYMBOLS:
         _ticksize = dataclient.getticksize(stock)
         trade_signals.update({stock.symbol:TradeSignalsHandler(
@@ -55,7 +57,6 @@ def create_trade_signals(dataclient):
             min_pricechange = MIN_PRICE_CHANGE[stock.symbol],
             )})
 
-
     for forex in FOREX_SYMBOLS:
         _ticksize = dataclient.getticksize(forex)
         trade_signals.update({forex.symbol:TradeSignalsHandler(
@@ -65,9 +66,10 @@ def create_trade_signals(dataclient):
             std_threshold = STD_THRESHOLD[forex.symbol],
             min_pricechange = MIN_PRICE_CHANGE[forex.symbol],
             )})
+
     return trade_signals
 
-def get_datas(dataclient, duration='1 H', timeframe='1 min'):
+def get_datas(dataclient, duration='1 D', timeframe='1 min'):
 
     datas = dict()
 
@@ -94,6 +96,8 @@ def getdates():
     return init_day, end_day
 
 def calc_std(data, period=6):
+    '''Standard deviation calculation
+    '''
     return data['Close'][-period:].std()
 
 if __name__ == '__main__':
@@ -112,7 +116,7 @@ if __name__ == '__main__':
     for key, value in signals.items():
         signals[key].generate_mp(parsedataframe(mp_data[key], 
             from_date=fromdate,
-            to_date=todate))
+            to_date=todate), dataname=key)
     
     # main loop
     while True:
@@ -121,20 +125,19 @@ if __name__ == '__main__':
         datas = get_datas(client)
 
         if new_day(last_cycle):
-            print('[ Download Market Profile Data ]')
             fromdate, todate = getdates()
             mp_data = get_datas(client, duration='2 D')
             for key, value in signals.items():
-                #TODO Fix parsedataframe function
+                print('[ Downloading %s Market Profile Data ]' % key)
                 signals[key].generate_mp(parsedataframe(mp_data[key],
                     from_date=fromdate,
-                    todate=todate))
+                    todate=todate), dataname=key)
                 signals[key].set_signal_mode()
 
-        print('[ Download 5 min Data ]')
-        data5min = get_datas(client, duration='2 H', timeframe='5 min')
+        data5min = get_datas(client, duration='1 D', timeframe='5 mins')
         for key, value in datas.items():
 
+            print('[ Downloading %s 5 min Data ]' % key)
             # give values to signal handler compute status
             signals[key].next(
                     value['datetime'].iloc[0],
@@ -155,7 +158,5 @@ if __name__ == '__main__':
                 print('\n[ SHORT SIGNAL ] %s  %s ' % (key, pd.Timestamp(dt.datetime.now())))
                 signals[key].print_status()
 
-        time.sleep(SLEEP_TIME - (dt.datetime.now() - last_cycle))
-
-
+        time.sleep(SLEEP_TIME - (dt.datetime.now().timestamp() - last_cycle.timestamp()))
 
