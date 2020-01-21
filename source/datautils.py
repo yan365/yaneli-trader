@@ -43,17 +43,20 @@ def generateprofiles(dataframe, ticksize=0.5, valuearea = 0.7,
 
     # Save figure
     if save_fig:
+
         val, vah = mp_slice.value_area
         plt.clf()
         plt.axhline(y=val, color='yellow', linestyle= '-')
         plt.axhline(y=vah, color='blue', linestyle= '-')
         plt.plot(dataframe['Open'].iloc[0], color='red', marker='o')
+
         fig = profile.plot(kind='barh')
         filename = name+'_'+mp_mode+'_'+str(dataframe['datetime'].iloc[
                     dataframe['datetime'].size-1])+'_'+\
                     str(dataframe['datetime'].iloc[0])
-        filename.replace(' ','_').replace(':','').replace('.','')+'.png'
+        filename = filename.replace(' ','_').replace(':','_').replace('.','')+'.png'
         fig.figure.savefig(filename)
+
     return profile, mp_slice
 
 def parsedata(data, from_date=None, to_date=None, size_limit=60*60*24):
@@ -106,21 +109,19 @@ def parsedata(data, from_date=None, to_date=None, size_limit=60*60*24):
 
     return dataframe
 
-def parsedataframe(dataframe, from_date=None, to_date=None, size_limit=60*60*24):
-    '''Get data from backtrader cerebro and convert
-    in a pandas dataframe. The columns names are changed for
-    compatibility with Market Profile library. The dataframe 
-    can be filtered by date and size.
+def parsedataframe(dataframe, from_date=None, to_date=None):
+    '''Adjust dataframe columns and filter by date. The columns names are changed for compatibility with Market Profile library.
     '''
     timestamp = []
     datetime = []
-    
-    # Define maximum size of data
-    _size = size_limit if dataframe.size > size_limit else dataframe.size
-    
 
     dataframe['Close'] = dataframe['Close'].astype('float')
-    #dataframe['Volume'] = dataframe['Volume'].astype('float')
+
+    lines, columns = dataframe.shape
+    for i in range(0, lines, 1):
+        timestamp.append(dt.datetime.timestamp(dataframe['datetime'].iloc[i]))
+
+    dataframe['timestamp'] = timestamp
 
     # To work properly with Market Profile library
     dataframe['datetime'] = pd.to_datetime(dataframe['datetime'],
@@ -147,7 +148,7 @@ def save_data(dataframe, output_filename='out.csv', sep=',', **kwargs):
     args.update(kwargs)
     dataframe.to_csv(**args)
 
-def plot_orders(data, orders, dataname='plotdata'):
+def plot_orders(data, orders, dataname='orders'):
     '''Plot close data with orders parameters
     '''
     title = dataname
@@ -175,12 +176,12 @@ def plot_orders(data, orders, dataname='plotdata'):
             if order._stoploss is not None:
                 plt.plot(order.executed_time, order._stoploss, '_', color= _color)
             if order._takeprofit is not None:
-                plt.plot(order.executed_time, order._takeprofit, '_', color= _color)
-    
-    #TODO save figure
-    #plt.show()
+                plt.plot(order.executed_time, order._takeprofit, '_', color= _color) 
+    plt.savefig(dataname.replace(' ','_').replace('.','')+'.png')
 
 def plot_data(dataframe, y_axis='close', **kwargs):
+    '''Bar plot of dataframe
+    '''
     args = {
             'y':y_axis,
             }

@@ -3,6 +3,7 @@
 
 import backtrader as bt
 import backtrader.feeds as btfeeds
+import backtrader.analyzers as analyzer
 import pandas as pd
 import argparse
 from tabulate import tabulate
@@ -12,8 +13,8 @@ from dataclient import *
 import datautils
 
 # Input File
-DEFAULT_FILE = 'EURUSD'
-CONTRACT = Forex('EURUSD', 'IDEALPRO', 'EUR')
+DEFAULT_FILE = 'GBPUSD'
+CONTRACT = Forex('GBPUSD', 'IDEALPRO', 'GBP')
 
 # TWS Parameters
 HOST='127.0.0.1'
@@ -21,8 +22,8 @@ PORT = 7497
 CLIENTID = 1234
 
 # Data Parameters
-DOWNLOAD_DATA = True
-DATA_DURATION = '5 D'
+DOWNLOAD_DATA =  False
+DATA_DURATION = '3 D'
 DATA_TIMEFRAME = '1 min'
 
 # Results Output File
@@ -40,15 +41,15 @@ OPTIMIZE_TAKEPROFIT = True
 OPTIMIZE_POSITIONTIMEDECAY = True
 OPTIMIZE_MINIMUMPRICECHANGE = True
 
-MA_PERIOD = [5, 10, 15]
-STDDEV_PERIOD = [6, 8, 10, 12]
-STD_THRESHOLD = [0.0008, 0.001]
-ATR_PERIOD = [10, 14, 18]
-MP_VALUEAREA_RANGE = [0.5, 0.7]
+MA_PERIOD = [5, 10]#[5, 10, 15]
+STDDEV_PERIOD = [6]#[6, 8, 10, 12]
+STD_THRESHOLD = [0.0008]#[0.0008, 0.001]
+ATR_PERIOD = [10]#[10, 14, 18]
+MP_VALUEAREA_RANGE = [0.7]#[0.5, 0.7]
 STOPLOSS_RANGE = [0.2]
 TAKEPROFIT_RANGE = [0.2]
-POSITIONTIMEDECAY = [ 60*60, 60*60*2]
-MINIMUMPRICECHANGE = [ 0.0002, 0.0004]
+POSITIONTIMEDECAY = [60*60]#[ 60*60, 60*60*2]
+MINIMUMPRICECHANGE = [0.0002]#[ 0.0002, 0.0004]
 
 class AcctStats(bt.Analyzer):
     
@@ -156,6 +157,9 @@ def run_optimization(args=None, **kwargs):
             timeframe = bt.TimeFrame.Minutes,
             compression = 5)
 
+    cerebro.addanalyzer(analyzer.DrawDown, _name='drawdown')
+    #cerebro.addanalyzer(analyzer.SharpeRatio, _name='sharpe', timeframe=bt.TimeFrame.Weeks)
+    #cerebro.addanalyzer(analyzer.PyFolio, _name='pyfolio')
     cerebro.addanalyzer(AcctStats)
 
     strategies = cerebro.optstrategy(
@@ -164,17 +168,36 @@ def run_optimization(args=None, **kwargs):
 
     results = cerebro.run()
 
-    df_results = pd.DataFrame({
-        r[0].params: 
-        r[0].analyzers.acctstats.get_analysis() for r in results}
-        ).T.loc[:, ['end', 'growth', 'return']]
+    df_results = pd.DataFrame()
+    for result in results:
+        for it in result:
+            df_results = df_results.append({
+                'Lot Config':it.params.lotconfig,
+                'Stop Loss':it.params.stoploss,
+                'Take Profit':it.params.takeprofit,
+                'Std Threshold':it.params.std_threshold,
+                'Minimum Price Change':it.params.minimumchangeprice,
+                'MA Period':it.params.ma_period,
+                'Std Period':it.params.stddev_period,
+                'ATR Period':it.params.atr_period,
+                'MP Value Area':it.params.mp_valuearea,
+                'MP Tick Size':it.params.mp_ticksize,
+                'Order Start Time':it.params.starttime,
+                'Order Final Time':it.params.orderfinaltime,
+                'Time to Close Orders':it.params.timetocloseorders,
+                'Time Between Orders':it.params.timebetweenorders,
+                'Position Time Decay':it.params.positiontimedecay,
+                'Return':it.analyzers.acctstats.get_analysis()['return'],
+                'End':it.analyzers.acctstats.get_analysis()['end'],
+                'Growth':it.analyzers.acctstats.get_analysis()['growth'],
+                'Drawdown':it.analyzers.drawdown.get_analysis(),
+                }, ignore_index=True)
 
-    print(df_results.head())
 
-    sorted_values = df_results.sort_values('return', ascending= False)
+    sorted_values = df_results.sort_values('Return', ascending= False)
     sorted_values.to_csv(OUTPUT_FILENAME, FILE_DELIMITER)
 
-    print(tabulate(sorted_values))
+    print(tabulate(sorted_values, headers='keys'))
 
 if __name__ == '__main__':
     run_optimization()

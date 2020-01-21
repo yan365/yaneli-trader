@@ -5,56 +5,37 @@ import backtrader as bt
 import backtrader.feeds as btfeeds
 import backtrader.analyzers as analyzer
 import datetime as dt
-
+from dataclient import *
+from strategies.optparams import TICKSIZE_CONFIGURATION
+from ib_insync import *
+from dataclient import *
 from strategies.multifadesystem import FadeSystemIB
 
-FOREX = [
-        'EUR.USD-CASH-IDEALPRO',
-        'AUD.USD-CASH-IDEALPRO',
-        'USD.JPY-CASH-IDEALPRO',
-        'GBP.USD-CASH-IDEALPRO',
-        'CAD.USD-CASH-IDEALPRO',
-        ]
+FOREX = {
+        'EUR.USD-CASH-IDEALPRO': Forex('EURUSD','IDEALPRO', 'EUR'),
+        'AUD.USD-CASH-IDEALPRO': Forex('AUDUSD','IDEALPRO', 'AUD'),
+        'USD.JPY-CASH-IDEALPRO': Forex('USDJPY','IDEALPRO', 'USD'),
+        'GBP.USD-CASH-IDEALPRO': Forex('GBPUSD','IDEALPRO', 'GBP'),
+        }
 
-STOCKS = []
+STOCKS = {}
 
-FUTURES = []
+FUTURES = {}
 
 HOST = '127.0.0.1'
 PORT = 7497
-CLIENTID = 1234
-
-STRATEGY_PARAMS = {
-        "lotconfig": 1,
-        "std_threshold": 1,
-        "stoploss": 0,
-        "takeprofit": 1,
-        "minimumchangeprice":0,
-        "mp_ticksize":0,
-        # Indicators
-        "ma_period": 8,
-        "stddev_period":6,
-        "atr_period":14,
-        "mp_valuearea": 0.25,
-        # Time
-        "starttime":dt.time(0, 0, 0),
-        "orderfinaltime":dt.time(15,0,0),
-        "timetocloseorders":dt.time(16,0,0),
-        "timebetweenorders":dt.time(0,1,0),
-        # Position Time
-        "positiontimedecay":60*60*2,
-        }
-
+CLIENTID_BT = 1234
+CLIENTID_DC = 1222
 
 def run_live(args=None, **kwargs):
+
     print('[ Configuring Cerebro ]')
-    
     cerebro = bt.Cerebro(live= True)
 
     broker_args = {
             "host":HOST,
             "port":PORT,
-            "clientId":CLIENTID,
+            "clientId":CLIENTID_BT,
             "notifyall":True,
             "reconnect":100,
             "timeout":2.0,
@@ -64,8 +45,13 @@ def run_live(args=None, **kwargs):
 
     ibstore = bt.stores.IBStore(**broker_args)
     cerebro.setbroker(ibstore.getbroker())
+    
+    dataclient = IBDataClient(HOST, PORT, CLIENTID_DC)
 
-    for dataname in FOREX:
+    for dataname, contract in FOREX.items():
+
+        TICKSIZE_CONFIGURATION.update({
+            dataname:dataclient.getticksize(contract)})
 
         data_args = {
                 "dataname": dataname,
@@ -73,13 +59,17 @@ def run_live(args=None, **kwargs):
                 "compression": 1,
                 #"historical":False,
                 #"fromdate":dt.datetime(2019,10,1),
-                #"todate":dt.datetime(2019,10,7)
+                #"todate":dt.datetime(2019,10,7),
+                "rtbar":True,
                 }
         data = ibstore.getdata(**data_args)
         print("[ Add Data ] %s" % dataname)
         cerebro.adddata(data)
-
-    for dataname in STOCKS:
+    
+    for dataname, contract in STOCKS.items():
+        
+        TICKSIZE_CONFIGURATION.update({
+            dataname:dataclient.getticksize(contract)})
         
         data_args = {
                 "dataname": dataname,
@@ -93,7 +83,12 @@ def run_live(args=None, **kwargs):
         print("[ Add Data ] %s" % dataname)
         cerebro.adddata(data)
 
-    for dataname in FUTURES:
+        TICKSIZE_CONFIGURATION.update({dataname:dataclient.getticksize(contract)})
+
+    for dataname, contract in FUTURES.items():
+        
+        TICKSIZE_CONFIGURATION.update({
+            dataname:dataclient.getticksize(contract)})
 
         data_args = {
                 "dataname": dataname,
@@ -107,10 +102,35 @@ def run_live(args=None, **kwargs):
         print("[ Add Data ] %s" % dataname)
         cerebro.adddata(data)
 
-    cerebro.addstrategy(FadeSystemIB, **STRATEGY_PARAMS)
+    strategy_params = {
+            "lotconfig": 1,
+            "std_threshold": 1,
+            "stoploss": 0,
+            "takeprofit": 1,
+            "minimumchangeprice":1,
+            # Indicators
+            "ma_period": 8,
+            "stddev_period":6,
+            "atr_period":14,
+            "mp_valuearea": 0.25,
+            # Time
+            "starttime":dt.time(0, 0, 0),
+            "orderfinaltime":dt.time(15,0,0),
+            "timetocloseorders":dt.time(16,0,0),
+            "timebetweenorders":60 * 5,
+            # Position Time
+            "positiontimedecay":60*60*2,
+            # Data Client Object
+            "dataclient":dataclient,
+            }
+
+
+    cerebro.addstrategy(FadeSystemIB, **strategy_params)
 
     print("[ Running Cerebro ]")
     cerebro.run()
+    
+    dataclient.close()
 
     cerebro.plot()
 

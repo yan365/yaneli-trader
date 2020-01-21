@@ -4,7 +4,9 @@
 '''
 
 LOTS_CONFIGURATION = [
-        [1,2,3,4,5,6]
+        [1,2,3,4,5,6],
+        [1,2,3,1,2,3],
+        [1,2,3,2,4,6],
         ]
 
 # Change this with dataclient
