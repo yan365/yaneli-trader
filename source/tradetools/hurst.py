@@ -16,6 +16,8 @@ DURATION = '100 D'
 
 CONTRACTS = {
         'EURUSD':Forex('EURUSD', 'IDEALPRO', 'EUR'),
+        'GBPUSD': Forex('GBPUSD', 'IDEALPRO', 'GBP'),
+         
         }
 
 def calc_hurst(data):
@@ -37,7 +39,7 @@ def calc_hurst(data):
     hurst = m[0] * 2
     return hurst
 
-if __main__ == '__main__':
+if __name__ == '__main__':
 
     client = IBDataClient(HOST, PORT, CLIENT_ID)
     
