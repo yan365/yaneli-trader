@@ -2,7 +2,7 @@ attrs==19.1.0
 backtrader==1.9.74.123
 beautifulsoup4==4.8.0
 ccxt==1.18.1119
-certifi==2019.6.16
+certifi==2022.12.7
 html5lib==1.0.1
 ib-insync==0.9.56
 IbPy2==0.8.0
